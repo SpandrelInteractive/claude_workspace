@@ -1,0 +1,66 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Task.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/update-task-artifact.py",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__orchestrator__(run_workflow|workflow_status)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/update-workflow-artifact.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__mem0__search_memories",
+      "mcp__mem0__add_memory",
+      "mcp__mem0__list_memories",
+      "mcp__mem0__delete_memory",
+      "mcp__mem0__search_graph",
+      "mcp__mem0__get_entity",
+      "mcp__gemini__analyze_files",
+      "mcp__gemini__review_diff",
+      "mcp__gemini__explain_architecture",
+      "mcp__gemini__refresh_index",
+      "mcp__gemini__ask_gemini",
+      "mcp__orchestrator__run_workflow",
+      "mcp__orchestrator__workflow_status",
+      "mcp__orchestrator__list_workflows",
+      "mcp__orchestrator__cancel_workflow",
+      "mcp__orchestrator__get_quota_state",
+      "mcp__orchestrator__get_cost_report",
+      "mcp__orchestrator__optimize_prompts",
+      "mcp__langfuse__log_event",
+      "mcp__langfuse__get_cost_report",
+      "mcp__langfuse__get_agent_performance",
+      "mcp__langfuse__get_traces",
+      "Bash(docker ps --format '{{.Names}} {{.Status}}' 2>&1)",
+      "Bash(docker compose -f {{INFRA_PATH}}/docker-compose.yml up -d 2>&1)",
+      "Bash(curl -s http://localhost:1337/v1/models 2>&1 | head -50)",
+      "Bash(curl -s http://localhost:3000 2>&1 | head -5)",
+      "Bash(curl -s http://localhost:6333/collections 2>/dev/null | head -5 || echo 'Qdrant not reachable')",
+      "Bash(curl -s http://localhost:11434/api/tags 2>/dev/null | head -5 || echo 'Ollama not reachable')"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "mem0",
+    "gemini",
+    "orchestrator",
+    "langfuse",
+    "sequential-thinking"
+  ]
+}

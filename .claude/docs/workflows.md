@@ -70,15 +70,15 @@ stateDiagram-v2
 ```
 
 **Nodes:**
-| Node | Agent Role | Model | Action |
-|------|-----------|-------|--------|
-| `plan` | Architect | Gemini 3.1 Pro | Decompose feature into tasks, define order |
-| `route` | Router (logic) | N/A | Classify next task, select model, check budget |
-| `execute_gemini` | Varies | Gemini 3.x | PydanticAI structured execution |
-| `execute_claude` | Implementer | Sonnet/Haiku | Return instructions for Agent tool |
-| `review` | Reviewer | Gemini 3 Flash | Review completed step output |
-| `pause` | (interrupt) | N/A | Human-in-the-loop budget approval |
-| `complete` | (terminal) | N/A | Summarize workflow, store in mem0 |
+| Node | Agent Role | Model | Action | Artifact |
+|------|-----------|-------|--------|----------|
+| `plan` | Architect | Gemini 3.1 Pro | Decompose feature into tasks, define order | `task_plan.md` |
+| `route` | Router (logic) | N/A | Classify next task, select model, check budget | — |
+| `execute_gemini` | Varies | Gemini 3.x | PydanticAI structured execution | — |
+| `execute_claude` | Implementer | Sonnet/Haiku | Return instructions for Agent tool | — |
+| `review` | Reviewer | Gemini 3 Flash | Review completed step output | — |
+| `pause` | (interrupt) | N/A | Human-in-the-loop budget approval | — |
+| `complete` | (terminal) | N/A | Summarize workflow, store in mem0 | `workflow_status.md` |
 
 **Budget profile:** Medium (default cost_limit: $2.00)
 
@@ -95,11 +95,11 @@ stateDiagram-v2
 ```
 
 **Nodes:**
-| Node | Agent Role | Model | Action |
-|------|-----------|-------|--------|
-| `gather_diff` | (logic) | N/A | Collect diff from git or provided text |
-| `analyze` | Reviewer | Gemini 3 Flash | Structured review via review_diff |
-| `summarize` | (logic) | N/A | Format ReviewResult schema |
+| Node | Agent Role | Model | Action | Artifact |
+|------|-----------|-------|--------|----------|
+| `gather_diff` | (logic) | N/A | Collect diff from git or provided text | — |
+| `analyze` | Reviewer | Gemini 3 Flash | Structured review via review_diff | — |
+| `summarize` | (logic) | N/A | Format ReviewResult schema | `review_result.md` |
 
 **Budget profile:** Low (all Gemini, effectively free)
 
@@ -118,13 +118,13 @@ stateDiagram-v2
 ```
 
 **Nodes:**
-| Node | Agent Role | Model | Action |
-|------|-----------|-------|--------|
-| `analyze_scope` | Researcher | Gemini 3.1 Pro | Identify all affected files/patterns |
-| `plan_changes` | Architect | Gemini 3.1 Pro | Ordered change plan with rollback points |
-| `execute_change` | Implementer | Sonnet 4.6 | Apply single change (worktree) |
-| `verify` | Reviewer | Gemini 3 Flash | Verify change correctness, check tests |
-| `complete` | (terminal) | N/A | Summarize, store patterns in mem0 |
+| Node | Agent Role | Model | Action | Artifact |
+|------|-----------|-------|--------|----------|
+| `analyze_scope` | Researcher | Gemini 3.1 Pro | Identify all affected files/patterns | — |
+| `plan_changes` | Architect | Gemini 3.1 Pro | Ordered change plan with rollback points | `implementation_plan.md` |
+| `execute_change` | Implementer | Sonnet 4.6 | Apply single change (worktree) | — |
+| `verify` | Reviewer | Gemini 3 Flash | Verify change correctness, check tests | — |
+| `complete` | (terminal) | N/A | Summarize, store patterns in mem0 | `workflow_status.md` |
 
 **Budget profile:** Medium
 

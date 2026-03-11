@@ -15,6 +15,10 @@ graph TB
         PS[Project Skills<br/>.claude/skills/]
     end
 
+    subgraph "Artifacts Layer"
+        ART[.claude/artifacts/<br/>task_plan, impl_plan,<br/>review, walkthrough, status]
+    end
+
     subgraph "MCP Servers"
         OM[orchestrator-mcp<br/>LangGraph + PydanticAI]
         GM[gemini-delegate<br/>Analysis Offloading]
@@ -41,6 +45,8 @@ graph TB
     end
 
     CC --> GS & PS
+    CC --> ART
+    OM -->|"generates"| ART
     CC --> OM & GM & MM & ST & LM
     CC -->|"Agent tool<br/>(subagents)"| SN & HK
 
@@ -168,8 +174,9 @@ graph TD
 | mem0-mcp | qdrant, neo4j, ollama, proxy | All agents (persistent memory) |
 | langfuse-mcp | langfuse server | Claude Code (observability) |
 | sequential-thinking | (self-contained) | Architect, Orchestrator roles |
-| Hooks | langfuse-mcp, orchestrator-mcp | Auto-logging, quota guardrails |
+| Hooks | langfuse-mcp, orchestrator-mcp | Auto-logging, quota guardrails, artifact generation |
 | Skills | (markdown files) | Claude Code (behavioral guidance) |
+| Artifacts | orchestrator-mcp, hooks, skills | User (reviewable deliverables: plans, reviews, status) |
 
 ## Key Design Decisions
 
@@ -179,3 +186,4 @@ graph TD
 4. **SQLite checkpointing** — LangGraph state persists across interruptions; no external DB needed
 5. **Structured outputs** — PydanticAI validates all agent responses against schemas; retries on failure
 6. **4-layer rate limiting** — Proxy, orchestrator, cron, and per-workflow budget caps
+7. **Artifact-driven transparency** — Workflows generate structured markdown deliverables at phase transitions; users review via inline feedback, not raw logs

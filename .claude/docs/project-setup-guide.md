@@ -23,7 +23,11 @@ Before setting up a project, ensure Part 1 is operational:
 # Create Claude Code project structure
 mkdir -p <project>/.claude/skills/<project>-patterns
 mkdir -p <project>/.claude/skills/<project>-workflows
+mkdir -p <project>/.claude/skills/implementation-plan
+mkdir -p <project>/.claude/skills/walkthrough
 mkdir -p <project>/.claude/docs
+mkdir -p <project>/.claude/hooks
+mkdir -p <project>/.claude/artifacts
 ```
 
 ### 2. Configure MCP Servers
@@ -156,12 +160,48 @@ Add the orchestration section to your project's CLAUDE.md. Copy the generic sect
 - Reference: [paths to ADRs, PRD, TDD]
 ```
 
-### 6. Update Settings
+### 6. Install Artifact Hooks and Skills
+
+Copy the artifact hooks and skills from the workspace template:
+
+```bash
+# Hooks — generate artifact files from tool responses
+cp claude_workspace/.claude/hooks/update-task-artifact.py <project>/.claude/hooks/
+cp claude_workspace/.claude/hooks/update-workflow-artifact.py <project>/.claude/hooks/
+chmod +x <project>/.claude/hooks/*.py
+
+# Skills — user-invokable artifact generators
+cp claude_workspace/.claude/skills/implementation-plan/SKILL.md <project>/.claude/skills/implementation-plan/
+cp claude_workspace/.claude/skills/walkthrough/SKILL.md <project>/.claude/skills/walkthrough/
+```
+
+These hooks auto-generate:
+- `tasks.md` — Live task list (on `Task*` tool calls)
+- `workflow_status.md` — Workflow progress (on `run_workflow`/`workflow_status` calls)
+
+The orchestrator-mcp also generates artifacts directly at workflow phase transitions:
+- `task_plan.md` — After planning phase
+- `implementation_plan.md` — After refactor planning
+- `review_result.md` — After review completes
+
+### 7. Update Settings
 
 Create `<project>/.claude/settings.local.json`:
 
 ```json
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Task.*",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-task-artifact.py", "timeout": 3000 }]
+      },
+      {
+        "matcher": "mcp__orchestrator__(run_workflow|workflow_status)",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-workflow-artifact.py", "timeout": 5000 }]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "mcp__mem0__search_memories",
@@ -185,13 +225,12 @@ Create `<project>/.claude/settings.local.json`:
       "mcp__langfuse__get_traces"
     ]
   },
-  "mcpServers": {
-    "enableAllProjectMcpServers": true
-  }
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["mem0", "gemini", "orchestrator", "langfuse", "sequential-thinking"]
 }
 ```
 
-### 7. Build Initial Index
+### 8. Build Initial Index
 
 ```bash
 # Start Claude Code in the project
@@ -202,7 +241,7 @@ claude
 > # Add key project facts to mem0
 ```
 
-### 8. Seed Knowledge Graph (Optional)
+### 9. Seed Knowledge Graph (Optional)
 
 If the project has well-defined entity relationships:
 ```
@@ -212,13 +251,14 @@ If the project has well-defined entity relationships:
 
 These will be stored in both vector (Qdrant) and graph (Neo4j) stores.
 
-### 9. Verify Setup
+### 10. Verify Setup
 
 Checklist:
 - [ ] `search_memories("project architecture")` returns results
 - [ ] `analyze_files` works with project files
 - [ ] `explain_architecture` returns project overview
-- [ ] `run_workflow("review", "test review")` creates a workflow
+- [ ] `run_workflow("review", "test review")` creates a workflow and generates `workflow_status.md`
+- [ ] `.claude/artifacts/` directory has generated files
 - [ ] `get_quota_state` returns model availability
 - [ ] Langfuse UI shows traces at localhost:3000
 

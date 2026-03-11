@@ -157,13 +157,14 @@ Get all relationships for a named entity from the knowledge graph.
 ### Tools
 
 #### `run_workflow(type: str, description: str, files: list[str] = [], options: dict = {}) -> dict`
-Launch a stateful multi-step workflow.
+Launch a stateful multi-step workflow. Generates artifacts at phase transitions (task plans, implementation plans, review results) to `.claude/artifacts/`.
 - **type:** "feature", "review", "refactor", "sprint"
 - **Returns:** `{ workflow_id, status, current_step, next_action }`
+- **Artifacts:** Triggers `update-workflow-artifact.py` PostToolUse hook → `workflow_status.md`
 - **Example:** `run_workflow("feature", "Add user authentication", files=["src/auth/"])`
 
 #### `workflow_status(workflow_id: str) -> dict`
-Get progress of a running workflow.
+Get progress of a running workflow. Updates `workflow_status.md` artifact via PostToolUse hook.
 - **Returns:** `{ workflow_id, status, completed_steps, current_step, next_action, cost_so_far }`
 
 #### `list_workflows(status_filter: str = "all") -> list[dict]`

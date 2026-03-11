@@ -16,6 +16,7 @@ Detailed guides live in `.claude/docs/`. Read them before asking the user for co
 | `observability.md` | Langfuse tracing and hooks |
 | `skills-guide.md` | Skills ecosystem and creation |
 | `rate-limiting.md` | Budget caps and rate limit strategy |
+| `artifacts.md` | Artifact system: types, lifecycle, hooks, renderers |
 
 ## Memory Protocol
 
@@ -70,6 +71,13 @@ After major code changes?
 - store workflow outcomes, architectural decisions, patterns in mem0
 - Use graph queries (search_graph, get_entity) for relational questions
 - Consolidate/prune memories periodically via cron
+
+### Artifact Protocol
+- Workflows auto-generate artifacts at phase transitions (see `artifacts.md`)
+- Use `/implementation-plan` before complex implementations
+- Use `/walkthrough` after completing significant work
+- Artifacts live in `.claude/artifacts/` — previous versions auto-archived
+- Check for user feedback below `<!-- Leave feedback -->` markers before regenerating
 
 ### Workflow Protocol
 - Multi-step tasks → `run_workflow` from orchestrator-mcp

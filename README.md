@@ -48,6 +48,7 @@ After setup, your Claude Code sessions gain:
 
 - **Automatic cost optimization** — routine work offloaded to free models
 - **Structured workflows** — features, refactors, and reviews follow repeatable state machines
+- **Artifact-driven transparency** — plans, reviews, and status rendered as reviewable markdown files with inline feedback
 - **Persistent memory** — decisions and patterns survive across sessions
 - **Specialized agent roles** — the right model for each type of work
 - **Full cost visibility** — Langfuse dashboard shows exactly where money goes
@@ -128,9 +129,14 @@ Part 1 infrastructure must be running:
 ├── .envrc                             # direnv environment
 ├── .gitignore                         # Standard ignores + .gemini-index
 ├── .claude/
-│   ├── settings.local.json            # MCP permissions
+│   ├── settings.local.json            # MCP permissions + artifact hooks
+│   ├── artifacts/                     # Generated deliverables (plans, reviews, status)
+│   ├── hooks/
+│   │   ├── update-task-artifact.py    # Task list artifact generator
+│   │   └── update-workflow-artifact.py # Workflow status artifact generator
 │   ├── docs/
 │   │   ├── usage-guide.md             # Generic framework guide
+│   │   ├── artifacts.md               # Artifact system documentation
 │   │   ├── project-guide.md.template  # Template for project-specific guide
 │   │   ├── project-setup-guide.md     # Full setup walkthrough
 │   │   ├── architecture-overview.md   # System diagrams
@@ -141,6 +147,8 @@ Part 1 infrastructure must be running:
 │   │   ├── skills-guide.md            # Skills ecosystem
 │   │   └── rate-limiting.md           # Budget strategy
 │   └── skills/
+│       ├── implementation-plan/SKILL.md  # /implementation-plan command
+│       ├── walkthrough/SKILL.md          # /walkthrough command
 │       ├── README.md                  # Skills setup instructions
 │       ├── project-patterns.SKILL.md.template
 │       └── project-workflows.SKILL.md.template
@@ -153,6 +161,7 @@ Detailed guides live in `.claude/docs/`:
 | Guide | Contents |
 |-------|----------|
 | `usage-guide.md` | Full framework reference: MCP servers, agent roles, routing, cost optimization |
+| `artifacts.md` | Artifact system: types, lifecycle, hooks, renderers, feedback |
 | `architecture-overview.md` | System diagrams and component interactions |
 | `agent-roles.md` | Role definitions, model mappings, and escalation paths |
 | `mcp-servers.md` | MCP server internals and configuration |

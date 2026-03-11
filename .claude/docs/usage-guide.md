@@ -207,10 +207,21 @@ These run automatically — no manual invocation needed:
 
 | Hook | Trigger | Effect |
 |------|---------|--------|
-| `log-to-langfuse.py` | PostToolUse | Logs every MCP tool call to Langfuse |
-| `quota-check.py` | PreToolUse | Warns/blocks before expensive Agent spawns |
+| `log-to-langfuse.py` | PostToolUse (`mcp__*`) | Logs every MCP tool call to Langfuse |
+| `quota-check.py` | PreToolUse (`Agent`) | Warns/blocks before expensive Agent spawns |
+| `update-task-artifact.py` | PostToolUse (`Task*`) | Renders live task list to `.claude/artifacts/tasks.md` |
+| `update-workflow-artifact.py` | PostToolUse (`mcp__orchestrator__*`) | Renders workflow status to `.claude/artifacts/workflow_status.md` |
 
 Hooks have a 3-5 second timeout and are non-blocking on failure.
+
+### Artifact Skills (User-Invoked)
+
+| Skill | Invocation | Artifact Generated |
+|-------|------------|-------------------|
+| `implementation-plan` | `/implementation-plan` | `.claude/artifacts/implementation_plan.md` |
+| `walkthrough` | `/walkthrough` | `.claude/artifacts/walkthrough.md` |
+
+See `artifacts.md` for the full artifact system documentation.
 
 ---
 
@@ -233,18 +244,21 @@ Hooks have a 3-5 second timeout and are non-blocking on failure.
 
 ### After Major Changes
 ```
-1. refresh_index()                           → Rebuild codebase digest
-2. add_memory("Completed: description")      → Store in mem0
-3. get_cost_report()                         → Check spending
+1. /walkthrough                              → Generate work summary artifact
+2. refresh_index()                           → Rebuild codebase digest
+3. add_memory("Completed: description")      → Store in mem0
+4. get_cost_report()                         → Check spending
 ```
 
 ### Adding a Feature (generic)
 ```
 1. get_quota_state()                         → Verify models available
-2. Use sequential-thinking for design if needed
-3. run_workflow("feature", "description")    → Multi-step execution
-4. refresh_index()                           → Update digest
-5. add_memory("Added feature: ...")          → Store outcome
+2. /implementation-plan                      → Draft plan artifact for review
+3. Use sequential-thinking for design if needed
+4. run_workflow("feature", "description")    → Multi-step execution (generates task_plan.md)
+5. /walkthrough                              → Generate summary artifact
+6. refresh_index()                           → Update digest
+7. add_memory("Added feature: ...")          → Store outcome
 ```
 
 For project-specific workflows (new-entity, new-page, etc.), see the project guide.
@@ -260,9 +274,11 @@ Each project extends the generic framework with:
 3. **`CLAUDE.md`** — Project-specific agent roles, review checklists, and development rules.
 4. **`.claude/skills/<project>-patterns/`** — Domain knowledge skill.
 5. **`.claude/skills/<project>-workflows/`** — Workflow definitions skill.
-6. **`.claude/settings.local.json`** — MCP permissions.
-7. **`.gemini-index`** — Codebase digest (rebuilt via `refresh_index`).
-8. **mem0 memories** — Seeded entity relationships and project facts.
+6. **`.claude/settings.local.json`** — MCP permissions and artifact hooks.
+7. **`.claude/hooks/`** — Artifact generation hooks (`update-task-artifact.py`, `update-workflow-artifact.py`).
+8. **`.claude/artifacts/`** — Generated deliverables: task plans, implementation plans, reviews, walkthroughs.
+9. **`.gemini-index`** — Codebase digest (rebuilt via `refresh_index`).
+10. **mem0 memories** — Seeded entity relationships and project facts.
 
 See `project-setup-guide.md` for step-by-step instructions on creating a new project instance.
 

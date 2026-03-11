@@ -73,7 +73,7 @@ Logged via `langfuse-mcp.log_event()` for:
 ### PostToolUse — log-to-langfuse.py
 
 ```
-Trigger: After any MCP tool call (tools: ["mcp__*"])
+Trigger: After any MCP tool call (matcher: "mcp__*")
 Timeout: 5000ms
 Input: JSON via stdin with tool_name, tool_input, duration
 Output: None (fire-and-forget to Langfuse)
@@ -85,10 +85,40 @@ Output: None (fire-and-forget to Langfuse)
 3. Script POSTs to Langfuse API (or uses SDK)
 4. Non-blocking — failure doesn't affect tool result
 
+### PostToolUse — update-task-artifact.py
+
+```
+Trigger: After Task* tool calls (matcher: "Task.*")
+Timeout: 3000ms
+Input: JSON via stdin with tool_name, tool_input, tool_response
+Output: Writes .claude/artifacts/tasks.md
+```
+
+**Data flow:**
+1. Claude Code calls TaskCreate/TaskUpdate/TaskList
+2. Hook parses task data from stdin, updates `.tasks-state.json`
+3. Renders markdown task list with status icons and agent attribution
+4. Auto-opens in VSCodium on first creation
+
+### PostToolUse — update-workflow-artifact.py
+
+```
+Trigger: After orchestrator workflow calls (matcher: "mcp__orchestrator__(run_workflow|workflow_status)")
+Timeout: 5000ms
+Input: JSON via stdin with tool_name, tool_response
+Output: Writes .claude/artifacts/workflow_status.md
+```
+
+**Data flow:**
+1. Claude Code calls `run_workflow` or `workflow_status`
+2. Hook parses workflow status from JSON response
+3. Renders workflow progress with completed steps and cost
+4. Auto-opens in VSCodium on first creation
+
 ### PreToolUse — quota-check.py
 
 ```
-Trigger: Before Agent tool calls (tools: ["Agent"])
+Trigger: Before Agent tool calls (matcher: "Agent")
 Timeout: 3000ms
 Input: JSON via stdin with tool_name, tool_input (includes model param)
 Output: Warning message if quota low, or empty to proceed
@@ -189,3 +219,5 @@ langfuse-db:
 | Review cycle | orchestrator-mcp @observe | Review findings, approval status |
 | Memory operations | PostToolUse hook | search/add calls, hit rate |
 | Budget decisions | orchestrator-mcp @observe | Pause events, escalations |
+| Task progress | update-task-artifact.py hook | Task list artifact in `.claude/artifacts/tasks.md` |
+| Workflow artifacts | update-workflow-artifact.py hook + orchestrator artifacts.py | Plans, reviews, status in `.claude/artifacts/` |

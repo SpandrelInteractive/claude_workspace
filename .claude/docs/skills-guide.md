@@ -77,6 +77,37 @@ Always-active cost awareness skill.
 
 **Triggers:** Always active (referenced from CLAUDE.md)
 
+## Artifact Skills (Part 1)
+
+These skills generate structured markdown artifacts in `.claude/artifacts/`.
+
+### implementation-plan
+**Path:** `<project>/.claude/skills/implementation-plan/SKILL.md`
+
+Generates a structured implementation plan before complex work begins.
+
+**Key knowledge areas:**
+- Reads codebase via `analyze_files` to understand current state
+- Drafts approach, file changes, test strategy, and risks
+- Writes `.claude/artifacts/implementation_plan.md`
+- Archives previous plan versions with timestamps
+- Reads user feedback from `<!-- Leave feedback -->` marker
+
+**Triggers:** `/implementation-plan`, "plan the implementation", complex multi-file changes
+
+### walkthrough
+**Path:** `<project>/.claude/skills/walkthrough/SKILL.md`
+
+Generates a post-work summary after completing significant changes.
+
+**Key knowledge areas:**
+- Reads `git diff` and `git log` for change context
+- References task artifact and workflow status if available
+- Writes `.claude/artifacts/walkthrough.md`
+- Includes verification checklist and next steps
+
+**Triggers:** `/walkthrough`, "summarize what was done", after completing a task
+
 ## Community Skills to Install
 
 | Source | Skill | Purpose | Install Command |
@@ -94,15 +125,25 @@ Always-active cost awareness skill.
 
 ### Directory Structure
 ```
-<project>/.claude/skills/
-  <project>-patterns/
-    SKILL.md               # Main skill file (entry point)
-    entities.md            # Domain entity reference
-    api-patterns.md        # API/service templates
-    testing-patterns.md    # Test conventions
-  <project>-workflows/
-    SKILL.md               # Workflow skill entry point
-    workflows.md           # Custom workflow definitions
+<project>/.claude/
+  artifacts/               # Generated deliverables (gitignored)
+    archive/               # Timestamped previous versions
+  hooks/
+    update-task-artifact.py       # Task list artifact hook
+    update-workflow-artifact.py   # Workflow status artifact hook
+  skills/
+    implementation-plan/
+      SKILL.md             # /implementation-plan slash command
+    walkthrough/
+      SKILL.md             # /walkthrough slash command
+    <project>-patterns/
+      SKILL.md             # Main skill file (entry point)
+      entities.md          # Domain entity reference
+      api-patterns.md      # API/service templates
+      testing-patterns.md  # Test conventions
+    <project>-workflows/
+      SKILL.md             # Workflow skill entry point
+      workflows.md         # Custom workflow definitions
 ```
 
 ### SKILL.md Format
