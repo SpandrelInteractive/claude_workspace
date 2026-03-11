@@ -1,0 +1,46 @@
+---
+name: {{PROJECT_ID}}-patterns
+description: Domain patterns, entity reference, and coding conventions for {{PROJECT_NAME}}
+---
+# {{PROJECT_NAME}} Development Patterns
+
+## Entities
+
+<!-- Define domain entities, their relationships, and validation rules -->
+<!-- Example:
+- **User**: System user with roles. Has many Orders.
+- **Order**: Purchase record. Belongs to User, has many OrderItems.
+
+```
+User 1──* Order
+Order 1──* OrderItem
+Product 1──* OrderItem
+```
+-->
+
+## Architecture Conventions
+
+<!-- DDD layers, naming conventions, folder structure -->
+<!-- Example:
+- Core (Domain): Entities, Value Objects, Domain Services
+- CoreApp (Application): Use Cases, DTOs, Interfaces
+- CoreData (Infrastructure): EF Core, Repositories, External Services
+-->
+
+## API Patterns
+
+<!-- Endpoint conventions, request/response templates -->
+<!-- Example:
+- Minimal API with CQRS: Commands via POST, Queries via GET
+- Request validation via FluentValidation
+- Response envelope: { data, errors, metadata }
+-->
+
+## Testing Conventions
+
+<!-- Test structure, fixtures, mocking patterns -->
+<!-- Example:
+- Unit tests: xUnit + Moq, test per use case
+- Integration tests: WebApplicationFactory + TestContainers
+- Naming: MethodName_Scenario_ExpectedResult
+-->

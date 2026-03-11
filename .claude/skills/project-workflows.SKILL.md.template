@@ -1,0 +1,43 @@
+---
+name: {{PROJECT_ID}}-workflows
+description: Project-specific workflow definitions for {{PROJECT_NAME}}
+---
+# {{PROJECT_NAME}} Workflows
+
+## Custom Workflow Types
+
+### new-entity
+Steps:
+1. Design entity (Architect: Gemini 3.1 Pro)
+2. Create domain model (Implementer: Sonnet)
+3. Create data mapping / persistence config (Implementer: Sonnet)
+4. Create repository (Implementer: Sonnet)
+5. Create API endpoint (Implementer: Sonnet)
+6. Write tests (Implementer: Sonnet)
+7. Review (Reviewer: Gemini 3 Flash)
+
+### new-endpoint
+Steps:
+1. Design API contract (Architect: Gemini 3.1 Pro)
+2. Implement endpoint (Implementer: Sonnet)
+3. Add validation (Fast-Coder: Haiku)
+4. Write tests (Implementer: Sonnet)
+5. Review (Reviewer: Gemini 3 Flash)
+
+### new-page
+Steps:
+1. Design page layout (Architect: Gemini 3.1 Pro)
+2. Create page + model (Implementer: Sonnet)
+3. Add form handling (Implementer: Sonnet)
+4. Review (Reviewer: Gemini 3 Flash)
+
+<!-- Add project-specific workflow types below -->
+
+## Entity Conventions
+
+<!-- How entities are structured in this project -->
+<!-- Example:
+- All entities inherit from BaseEntity (Id, CreatedAt, UpdatedAt)
+- Use Value Objects for compound fields
+- Validation in domain layer, not data layer
+-->

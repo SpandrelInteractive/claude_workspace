@@ -1,0 +1,72 @@
+{
+  "mcpServers": {
+    "mem0": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "{{INFRA_PATH}}/mem0-mcp",
+        "mem0-mcp"
+      ],
+      "env": {
+        "MEM0_APP_ID": "{{PROJECT_ID}}",
+        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_API_KEY": "dummy-key",
+        "MEM0_ENABLE_GRAPH": "true"
+      }
+    },
+    "gemini": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "{{INFRA_PATH}}/gemini-delegate",
+        "gemini-delegate"
+      ],
+      "env": {
+        "PROJECT_ROOT": "{{PROJECT_ROOT}}",
+        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_API_KEY": "dummy-key",
+        "GEMINI_PRO_MODEL": "gemini-3-flash",
+        "GEMINI_FLASH_MODEL": "gemini-2.5-flash-lite"
+      }
+    },
+    "orchestrator": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "{{INFRA_PATH}}/orchestrator-mcp",
+        "orchestrator-mcp"
+      ],
+      "env": {
+        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_API_KEY": "dummy-key",
+        "LANGFUSE_HOST": "http://localhost:3000",
+        "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}",
+        "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}"
+      }
+    },
+    "langfuse": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "{{INFRA_PATH}}/langfuse-mcp",
+        "langfuse-mcp"
+      ],
+      "env": {
+        "LANGFUSE_HOST": "http://localhost:3000",
+        "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}",
+        "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropics/sequential-thinking"
+      ]
+    }
+  }
+}

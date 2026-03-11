@@ -1,0 +1,116 @@
+# {{PROJECT_NAME}} Project Guide
+
+Project-specific conventions, workflows, and rules. This guide supplements the generic `usage-guide.md`.
+
+---
+
+## Overview
+
+<!-- Brief description of what this project does and who it serves -->
+
+**Stack:** <!-- e.g., C#, ASP.NET Core, EF Core, React, PostgreSQL -->
+
+---
+
+## Domain Entities
+
+<!-- Define entities and their relationships -->
+<!--
+```
+User 1──* Order
+Order 1──* OrderItem
+Product 1──* OrderItem
+```
+
+| Entity | Description |
+|--------|-------------|
+| **User** | System user with roles and permissions |
+| **Order** | Purchase record belonging to a User |
+-->
+
+---
+
+## Architecture Rules
+
+<!-- Project-specific architecture constraints -->
+<!-- Example:
+### Layers
+- Domain: Pure business logic, no infrastructure dependencies
+- Application: Use cases, DTOs, CQRS handlers
+- Infrastructure: ORM, repositories, external services
+- Presentation: API controllers / pages
+
+### Key Rules
+- Queries are page-specific — never share between views
+- All business logic is backend-driven
+- Full audit trail for mutations
+-->
+
+---
+
+## Agent Roles (Project Additions)
+
+| Role | Project Skills | Additional Context |
+|------|---------------|-------------------|
+| **Implementer** | `{{PROJECT_ID}}-patterns` | <!-- conventions, stack --> |
+| **Reviewer** | `{{PROJECT_ID}}-patterns` | Uses the review checklist below |
+| **Architect** | `{{PROJECT_ID}}-patterns` | References `docs/PRD.md`, `docs/TDD.md`, `docs/ADRs/` |
+
+---
+
+## Review Checklist
+
+<!-- Project-specific items to check during code review -->
+<!--
+- [ ] Layer violations
+- [ ] ORM anti-patterns
+- [ ] Security issues
+- [ ] Forbidden patterns (list them)
+-->
+
+---
+
+## Project Workflows
+
+<!-- Document each custom workflow type -->
+<!--
+### new-entity
+```
+1. Architect (Gemini 3.1 Pro): Design entity
+2. Implementer (Sonnet): Create domain model
+3. Implementer (Sonnet): Create persistence config
+4. Implementer (Sonnet): Create repository
+5. Implementer (Sonnet): Create API endpoint + handlers
+6. Implementer (Sonnet): Write tests
+7. Reviewer (Gemini 3 Flash): Validate
+```
+**Invocation:** `run_workflow("new-entity", "Add Order entity with line items")`
+-->
+
+---
+
+## Testing Conventions
+
+<!-- Framework, structure, naming -->
+<!--
+- **Framework:** xUnit + Moq
+- **Unit tests:** Per use case / per handler
+- **Integration tests:** WebApplicationFactory + TestContainers
+- **Naming:** MethodName_Scenario_ExpectedResult
+-->
+
+---
+
+## Security & Deployment
+
+<!-- Authentication, authorization, secrets management, deployment pipeline -->
+
+---
+
+## Reference Documents
+
+| Document | Path | Contains |
+|----------|------|----------|
+| Product Requirements | `docs/PRD.md` | User stories, features, business rules |
+| Technical Design | `docs/TDD.md` | Architecture, entity definitions, API contracts |
+| Architecture Decisions | `docs/ADRs/` | Tech stack choices, pattern decisions |
