@@ -1,6 +1,58 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/session-gate.py",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/throttle.py",
+            "timeout": 1000
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/model-gate.py",
+            "timeout": 1000
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/task-gate.py",
+            "timeout": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/gemini-delegation.py",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/throttle-tracker.py",
+            "timeout": 1000
+          }
+        ]
+      },
       {
         "matcher": "Task.*",
         "hooks": [
@@ -18,6 +70,21 @@
             "type": "command",
             "command": "python3 .claude/hooks/update-workflow-artifact.py",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/memory-save.py",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|Write)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/doc-tracker.py",
+            "timeout": 1000
           }
         ]
       }
@@ -36,6 +103,8 @@
       "mcp__gemini__explain_architecture",
       "mcp__gemini__refresh_index",
       "mcp__gemini__ask_gemini",
+      "mcp__orchestrator__validate_system",
+      "mcp__orchestrator__init_session",
       "mcp__orchestrator__run_workflow",
       "mcp__orchestrator__workflow_status",
       "mcp__orchestrator__list_workflows",

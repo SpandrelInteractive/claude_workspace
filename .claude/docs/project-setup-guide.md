@@ -160,75 +160,50 @@ Add the orchestration section to your project's CLAUDE.md. Copy the generic sect
 - Reference: [paths to ADRs, PRD, TDD]
 ```
 
-### 6. Install Artifact Hooks and Skills
+### 6. Install Hooks and Skills
 
-Copy the artifact hooks and skills from the workspace template:
+Copy all hooks (MAO enforcement + artifact generation) and skills from the workspace template:
 
 ```bash
-# Hooks — generate artifact files from tool responses
-cp claude_workspace/.claude/hooks/update-task-artifact.py <project>/.claude/hooks/
-cp claude_workspace/.claude/hooks/update-workflow-artifact.py <project>/.claude/hooks/
-chmod +x <project>/.claude/hooks/*.py
+# All hooks — MAO enforcement + artifact generation
+cp claude_workspace/.claude/hooks/*.py <project>/.claude/hooks/
 
 # Skills — user-invokable artifact generators
-cp claude_workspace/.claude/skills/implementation-plan/SKILL.md <project>/.claude/skills/implementation-plan/
-cp claude_workspace/.claude/skills/walkthrough/SKILL.md <project>/.claude/skills/walkthrough/
+cp -r claude_workspace/.claude/skills/implementation-plan <project>/.claude/skills/
+cp -r claude_workspace/.claude/skills/walkthrough <project>/.claude/skills/
 ```
 
-These hooks auto-generate:
-- `tasks.md` — Live task list (on `Task*` tool calls)
-- `workflow_status.md` — Workflow progress (on `run_workflow`/`workflow_status` calls)
+**MAO Enforcement Hooks** (7 phases):
 
-The orchestrator-mcp also generates artifacts directly at workflow phase transitions:
-- `task_plan.md` — After planning phase
-- `implementation_plan.md` — After refactor planning
-- `review_result.md` — After review completes
+| Hook | Type | Purpose |
+|------|------|---------|
+| `session-gate.py` | PreToolUse | Blocks tools until `init_session` validates infrastructure |
+| `throttle.py` | PreToolUse | Budget limits per model tier (opus/sonnet) |
+| `throttle-tracker.py` | PostToolUse | Tracks Agent calls per model tier |
+| `model-gate.py` | PreToolUse | Enforces cheapest-capable-first model selection |
+| `task-gate.py` | PreToolUse | Reminds to use TaskCreate/run_workflow for complex work |
+| `gemini-delegation.py` | PreToolUse | Suggests analyze_files after 5+ file reads |
+| `memory-save.py` | PostToolUse | Auto-captures workflow outcomes for mem0 |
+| `doc-tracker.py` | PostToolUse | Flags stale docs when source files change |
+
+**Artifact Hooks**:
+
+| Hook | Type | Purpose |
+|------|------|---------|
+| `update-task-artifact.py` | PostToolUse | Maintains live task list in `tasks.md` |
+| `update-workflow-artifact.py` | PostToolUse | Renders workflow status in `workflow_status.md` |
+
+**Bootstrap**: Create `.mao-bootstrap` file in project root to bypass session gate during initial setup. Remove after `init_session` succeeds.
 
 ### 7. Update Settings
 
-Create `<project>/.claude/settings.local.json`:
+Copy `settings.local.json` from the workspace template:
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Task.*",
-        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-task-artifact.py", "timeout": 3000 }]
-      },
-      {
-        "matcher": "mcp__orchestrator__(run_workflow|workflow_status)",
-        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-workflow-artifact.py", "timeout": 5000 }]
-      }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "mcp__mem0__search_memories",
-      "mcp__mem0__add_memory",
-      "mcp__mem0__search_graph",
-      "mcp__mem0__get_entity",
-      "mcp__gemini__analyze_files",
-      "mcp__gemini__review_diff",
-      "mcp__gemini__explain_architecture",
-      "mcp__gemini__refresh_index",
-      "mcp__gemini__ask_gemini",
-      "mcp__orchestrator__run_workflow",
-      "mcp__orchestrator__workflow_status",
-      "mcp__orchestrator__list_workflows",
-      "mcp__orchestrator__cancel_workflow",
-      "mcp__orchestrator__get_quota_state",
-      "mcp__orchestrator__get_cost_report",
-      "mcp__langfuse__log_event",
-      "mcp__langfuse__get_cost_report",
-      "mcp__langfuse__get_agent_performance",
-      "mcp__langfuse__get_traces"
-    ]
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["mem0", "gemini", "orchestrator", "langfuse", "sequential-thinking"]
-}
+```bash
+cp claude_workspace/.claude/settings.local.json <project>/.claude/settings.local.json
 ```
+
+This registers all PreToolUse and PostToolUse hooks, MCP server permissions, and tool allowlists. See the template file for the full configuration.
 
 ### 8. Build Initial Index
 
@@ -254,13 +229,17 @@ These will be stored in both vector (Qdrant) and graph (Neo4j) stores.
 ### 10. Verify Setup
 
 Checklist:
+- [ ] `init_session` succeeds and writes breadcrumb to `.claude/artifacts/.session-validated`
+- [ ] Tools are blocked when breadcrumb is deleted (session gate works)
 - [ ] `search_memories("project architecture")` returns results
 - [ ] `analyze_files` works with project files
 - [ ] `explain_architecture` returns project overview
 - [ ] `run_workflow("review", "test review")` creates a workflow and generates `workflow_status.md`
 - [ ] `.claude/artifacts/` directory has generated files
 - [ ] `get_quota_state` returns model availability
+- [ ] `get_cost_report` returns throttle state with budget limits
 - [ ] Langfuse UI shows traces at localhost:3000
+- [ ] Remove `.mao-bootstrap` file after all checks pass
 
 ## Example: union_dev Instantiation (Deferred)
 

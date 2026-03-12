@@ -44,7 +44,8 @@
         "ANTHROPIC_API_KEY": "dummy-key",
         "LANGFUSE_HOST": "http://localhost:3000",
         "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}",
-        "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}"
+        "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}",
+        "CLAUDE_PROJECT_DIR": "{{PROJECT_ROOT}}"
       }
     },
     "langfuse": {

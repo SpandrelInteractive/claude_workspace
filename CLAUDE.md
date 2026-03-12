@@ -85,6 +85,24 @@ After major code changes?
 - Design problems → engage sequential-thinking MCP first
 - Recreate CronCreate jobs at session start (3-day expiry)
 
+### MAO Enforcement (Hook System)
+
+Seven PreToolUse/PostToolUse hooks enforce orchestration rules automatically:
+
+| Phase | Hook | Trigger | Enforcement |
+|-------|------|---------|-------------|
+| 1 | `session-gate.py` | PreToolUse `.*` | Blocks ALL tools until `init_session` writes daily breadcrumb |
+| 2 | `throttle.py` + `throttle-tracker.py` | Pre+Post `Agent` | Budget limits per model tier (SESSION_BUDGET env) |
+| 3 | `task-gate.py` | PreToolUse `Agent` | One-shot reminder after 5+ Agent calls without TaskCreate |
+| 4 | `model-gate.py` | PreToolUse `Agent` | Cheapest-capable-first — blocks opus/sonnet misuse |
+| 5 | `gemini-delegation.py` | PreToolUse `Read` | After 5+ unique source reads → suggests analyze_files |
+| 6 | `memory-save.py` | PostToolUse orchestrator | Auto-captures workflow outcomes for mem0 |
+| 7 | `doc-tracker.py` | PostToolUse `Edit\|Write` | Flags stale docs when source files change |
+
+- Budget profiles: low (0 opus, 2 sonnet), **medium** (2 opus, 10 sonnet), high, unlimited
+- Override: `SESSION_BUDGET=high` in `.envrc`
+- Bootstrap: create `.mao-bootstrap` file to bypass session gate during initial setup
+
 ## Project Agent Roles
 
 <!-- Customize these for your project -->
