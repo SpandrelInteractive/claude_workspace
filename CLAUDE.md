@@ -18,6 +18,14 @@ Detailed guides live in `.claude/docs/`. Read them before asking the user for co
 | `rate-limiting.md` | Budget caps and rate limit strategy |
 | `artifacts.md` | Artifact system: types, lifecycle, hooks, renderers |
 
+## CLI Tools
+
+Scripts in `.claude/tools/` are available for use via Bash.
+
+| Tool | Usage |
+|------|-------|
+| `reset-mcps.sh` | Kill MCP server processes so Claude Code auto-restarts them. Run `.claude/tools/reset-mcps.sh` to reset all, or `.claude/tools/reset-mcps.sh mem0 gemini` for specific servers. Use when an MCP server is unresponsive or returning errors. |
+
 ## Memory Protocol
 
 - **PROHIBITED**: Never use the `Write` tool to modify `.claude/projects/*/MEMORY.md`.
@@ -53,13 +61,16 @@ After major code changes?
 - Delegate to other roles via Agent tool or orchestrator-mcp workflows
 - Always check quota before spawning expensive subagents: `get_quota_state`
 
-### Model Selection (cheapest capable first)
-1. Gemini 2.5 Flash Lite — indexing, memory extraction, classification
-2. Gemini 3 Flash — reviews, analysis, brainstorming, bulk file reads
-3. Gemini 3.1 Pro — complex reasoning, architecture, long-context analysis
-4. Haiku 4.5 — quick fixes, boilerplate, simple edits
-5. Sonnet 4.6 — multi-file implementation, tests, refactoring
-6. Opus 4.6 — final decisions, ambiguous debugging, architecture sign-off
+### Model Selection (Claude primary, Gemini for large context)
+**Claude (primary — runs via Claude Code Agent tool):**
+1. Haiku 4.5 — classify, index, document, quick fixes, boilerplate
+2. Sonnet 4.6 — implement, test, refactor, review, research
+3. Opus 4.6 — design, debug, architecture sign-off, ambiguous problems
+
+**Gemini (large-context fallback only — runs via proxy):**
+4. Gemini 2.5 Flash Lite — bulk indexing, memory extraction, classification
+5. Gemini 3 Flash — bulk file reads, large code analysis
+6. Gemini 3.1 Pro — long-context analysis when Claude context is insufficient
 
 ### Observability
 - All workflow executions are traced in Langfuse (http://localhost:3000)
@@ -84,24 +95,6 @@ After major code changes?
 - Single-step delegation → Agent tool with model param
 - Design problems → engage sequential-thinking MCP first
 - Recreate CronCreate jobs at session start (3-day expiry)
-
-### MAO Enforcement (Hook System)
-
-Seven PreToolUse/PostToolUse hooks enforce orchestration rules automatically:
-
-| Phase | Hook | Trigger | Enforcement |
-|-------|------|---------|-------------|
-| 1 | `session-gate.py` | PreToolUse `.*` | Blocks ALL tools until `init_session` writes daily breadcrumb |
-| 2 | `throttle.py` + `throttle-tracker.py` | Pre+Post `Agent` | Budget limits per model tier (SESSION_BUDGET env) |
-| 3 | `task-gate.py` | PreToolUse `Agent` | One-shot reminder after 5+ Agent calls without TaskCreate |
-| 4 | `model-gate.py` | PreToolUse `Agent` | Cheapest-capable-first — blocks opus/sonnet misuse |
-| 5 | `gemini-delegation.py` | PreToolUse `Read` | After 5+ unique source reads → suggests analyze_files |
-| 6 | `memory-save.py` | PostToolUse orchestrator | Auto-captures workflow outcomes for mem0 |
-| 7 | `doc-tracker.py` | PostToolUse `Edit\|Write` | Flags stale docs when source files change |
-
-- Budget profiles: low (0 opus, 2 sonnet), **medium** (2 opus, 10 sonnet), high, unlimited
-- Override: `SESSION_BUDGET=high` in `.envrc`
-- Bootstrap: create `.mao-bootstrap` file to bypass session gate during initial setup
 
 ## Project Agent Roles
 

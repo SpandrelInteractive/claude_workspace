@@ -8,7 +8,7 @@
 | mem0-mcp | EXISTING | ~/projects/ai-infra/mem0-mcp/ | Persistent vector + graph memory |
 | orchestrator-mcp | NEW | ~/projects/ai-infra/orchestrator-mcp/ | LangGraph workflow engine |
 | langfuse-mcp | NEW | ~/projects/ai-infra/langfuse-mcp/ | Observability bridge |
-| sequential-thinking | NEW | npx @anthropics/sequential-thinking | Reflective reasoning |
+| sequential-thinking | NEW | npx @modelcontextprotocol/server-sequential-thinking | Reflective reasoning |
 
 ## Server Dependency Diagram
 
@@ -243,7 +243,7 @@ Full trace for a workflow — all steps, models, costs.
 
 ## sequential-thinking (NEW)
 
-**Run:** `npx @anthropics/sequential-thinking`
+**Run:** `npx @modelcontextprotocol/server-sequential-thinking`
 **Type:** stdio MCP server (Node.js)
 
 ### Tools
@@ -265,7 +265,7 @@ Get the synthesized conclusion from the thought sequence.
 {
   "sequential-thinking": {
     "command": "npx",
-    "args": ["-y", "@anthropics/sequential-thinking"]
+    "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
   }
 }
 ```

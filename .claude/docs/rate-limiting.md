@@ -192,46 +192,6 @@ Evaluator role (background) monitors:
 - Per-workflow cost > budget * 0.8 → pre-emptive warning
 - Model usage pattern anomaly → suggest router adjustment
 
-## Layer 5: MAO Enforcement Hooks (Implemented)
-
-Session-level enforcement via Claude Code PreToolUse/PostToolUse hooks.
-
-### Session Gate (Phase 1)
-- `session-gate.py` blocks ALL tools until `init_session` validates infrastructure
-- Ensures proxy, Qdrant, Ollama, Langfuse are healthy before any work begins
-- Daily breadcrumb in `.claude/artifacts/.session-validated`
-
-### Adaptive Throttle (Phase 2)
-- `throttle.py` enforces per-session budget on Agent calls by model tier
-- Budget profiles mirror `budgets.py`: low/medium/high/unlimited
-- `throttle-tracker.py` counts calls after execution
-- State in `.claude/artifacts/.throttle-state.json`, resets daily
-
-### Model Selection Gate (Phase 4)
-- `model-gate.py` enforces cheapest-capable-first for Agent calls
-- Blocks opus unless task requires debugging/architecture/investigation
-- Blocks sonnet for simple tasks that haiku can handle
-- Blocks expensive models on Explore/Plan subagent types
-
-### Gemini Delegation (Phase 5)
-- `gemini-delegation.py` tracks unique source file reads
-- After 5+ reads, suggests `analyze_files` for bulk comprehension
-- 5-minute cooldown, skips config/markdown files
-
-### get_cost_report Integration
-
-`get_cost_report` reads throttle state file and returns:
-```json
-{
-  "throttle": {
-    "profile": "medium",
-    "limits": {"max_opus_calls": 2, "max_sonnet_calls": 10},
-    "usage": {"opus_calls": 1, "sonnet_calls": 3},
-    "remaining": {"opus": 1, "sonnet": 7}
-  }
-}
-```
-
 ## Cost Optimization Strategies
 
 1. **Gemini-first:** Always try free model before paid
@@ -240,4 +200,3 @@ Session-level enforcement via Claude Code PreToolUse/PostToolUse hooks.
 4. **Smart escalation:** Only escalate on actual failure, not predicted complexity
 5. **Background indexing:** Keep index fresh to avoid expensive re-analysis
 6. **Memory-first:** Check mem0 before re-computing (search_memories before design)
-7. **Hook enforcement:** MAO hooks automatically block misuse before it happens

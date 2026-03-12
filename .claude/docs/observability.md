@@ -2,16 +2,19 @@
 
 ## Overview
 
-Observability is built on Langfuse (self-hosted) and a 7-phase hook system that enforces orchestration rules and tracks usage automatically.
+Observability is built on Langfuse (self-hosted) and integrated at three levels:
+1. **Automatic** — PostToolUse hook logs every MCP tool call
+2. **Workflow** — LangGraph nodes traced via `@observe()` decorator
+3. **On-demand** — Manual queries via langfuse-mcp tools
 
 ## Langfuse Architecture
 
 ```mermaid
 graph TB
     subgraph "Data Sources"
+        H[PostToolUse Hook<br/>~/.claude/hooks/log-to-langfuse.py]
         OM[orchestrator-mcp<br/>tracing.py @observe]
         M[Manual<br/>langfuse-mcp log_event]
-        MS[memory-save.py<br/>workflow outcomes]
     end
 
     subgraph "Langfuse Stack"
@@ -26,136 +29,27 @@ graph TB
         UI[Langfuse Web UI]
     end
 
+    H -->|HTTP POST| LF
     OM -->|Python SDK| LF
     M -->|Python SDK| LF
-    MS -->|pending file| LF
     LF --> PG
     LF --> CR & AP & TR & UI
 ```
 
-## Hook System — MAO Enforcement
+## What Gets Traced
 
-The Multi-Agent Orchestration (MAO) enforcement system uses Claude Code hooks to automatically enforce cost, model selection, and workflow discipline.
+### Automatic (PostToolUse Hook)
 
-### Hook Registry
+Every MCP tool call is logged with:
+- **Tool name** (e.g., `mcp__gemini__analyze_files`)
+- **Timestamp**
+- **Duration** (measured by hook)
+- **Input size** (character count of arguments)
+- **Agent context** (which subagent, if any)
 
-#### PreToolUse Hooks (run before tool execution)
+The hook script receives tool call metadata via stdin from Claude Code's hook system.
 
-| Matcher | Hook | Phase | Description |
-|---------|------|-------|-------------|
-| `.*` | `session-gate.py` | 1 | Hard-blocks ALL tools until `init_session` writes daily breadcrumb |
-| `Agent` | `throttle.py` | 2 | Blocks Agent calls when model tier budget exhausted |
-| `Agent` | `model-gate.py` | 4 | Enforces cheapest-capable-first model selection |
-| `Agent` | `task-gate.py` | 3 | One-time reminder after 5+ agents without task tracking |
-| `Read` | `gemini-delegation.py` | 5 | Suggests analyze_files after 5+ unique source file reads |
-
-#### PostToolUse Hooks (run after tool execution)
-
-| Matcher | Hook | Phase | Description |
-|---------|------|-------|-------------|
-| `Agent` | `throttle-tracker.py` | 2 | Increments call counters per model tier |
-| `Task.*` | `update-task-artifact.py` | — | Maintains live task list artifact |
-| `mcp__orchestrator__*` | `update-workflow-artifact.py` | — | Renders workflow status artifact |
-| `mcp__orchestrator__*` | `memory-save.py` | 6 | Auto-captures workflow outcomes for mem0 |
-| `(Edit\|Write)` | `doc-tracker.py` | 7 | Tracks source changes and flags stale docs |
-
-### Phase 1: Session Gate (`session-gate.py`)
-
-```
-Trigger: PreToolUse on ALL tools (matcher: ".*")
-Timeout: 2000ms
-```
-
-**Behavior:**
-- Blocks every tool call until `init_session` from orchestrator-mcp is called
-- `init_session` validates health (proxy, Qdrant, Ollama, Langfuse), checks quota, writes breadcrumb
-- Breadcrumb: `.claude/artifacts/.session-validated` (JSON with date, services, context)
-- Resets daily (midnight boundary)
-- Whitelists: `validate_system`, `init_session`, `ToolSearch`
-- Bootstrap escape: create `.mao-bootstrap` file in project root to bypass during initial setup
-
-### Phase 2: Adaptive Throttle (`throttle.py` + `throttle-tracker.py`)
-
-```
-Trigger: PreToolUse + PostToolUse on Agent
-Timeout: 1000ms each
-State: .claude/artifacts/.throttle-state.json
-```
-
-**Budget profiles** (matches orchestrator-mcp `budgets.py`):
-
-| Profile | Max Opus | Max Sonnet | Gemini |
-|---------|----------|------------|--------|
-| low | 0 | 2 | Unlimited |
-| **medium** (default) | 2 | 10 | Unlimited |
-| high | 5 | 25 | Unlimited |
-| unlimited | No limit | No limit | Unlimited |
-
-- Override via `SESSION_BUDGET` env var in `.envrc`
-- Haiku calls are never throttled
-- State resets daily
-- When blocked: suggests cheaper model or Gemini delegation
-
-### Phase 3: Task Gate (`task-gate.py`)
-
-```
-Trigger: PreToolUse on Agent
-Timeout: 1000ms
-```
-
-- Fires once per session after 5+ Agent calls without `TaskCreate` or `run_workflow`
-- Suggests structured work: `TaskCreate` for progress tracking, `run_workflow` for managed execution
-- Auto-dismisses after firing once (writes dismiss flag to throttle state)
-
-### Phase 4: Model Selection Gate (`model-gate.py`)
-
-```
-Trigger: PreToolUse on Agent
-Timeout: 1000ms
-```
-
-Enforces cheapest-capable-first model hierarchy:
-- **Explore/Plan/claude-code-guide** subagent types → blocks opus and sonnet
-- **model=opus** → requires justifying keywords (debug, architecture, investigate, diagnose, etc.)
-- **model=sonnet** → blocks short/simple tasks without implementation keywords
-
-### Phase 5: Gemini Delegation (`gemini-delegation.py`)
-
-```
-Trigger: PreToolUse on Read
-Timeout: 1000ms
-```
-
-- Tracks unique source file reads in throttle state
-- After 5+ unique reads, blocks next Read with suggestion to use `analyze_files`
-- Skips config/settings/markdown files (legitimate individual reads)
-- 5-minute cooldown between blocks
-- Retry allowed (the deny is a nudge, not a hard stop)
-
-### Phase 6: Memory Auto-Save (`memory-save.py`)
-
-```
-Trigger: PostToolUse on mcp__orchestrator__(run_workflow|workflow_status)
-Timeout: 2000ms
-```
-
-- When workflow reaches status=completed or status=failed
-- Writes outcome summary to `.claude/artifacts/.pending-memory-save.json`
-- Queue format: main Claude process should check and persist to mem0
-
-### Phase 7: Documentation Sync (`doc-tracker.py`)
-
-```
-Trigger: PostToolUse on Edit|Write
-Timeout: 1000ms
-```
-
-- Tracks source file modifications in `backend/`, `frontend/src/`, `orchestrator-mcp/`, `.claude/hooks/`
-- Maps source patterns to related doc files
-- Writes `.claude/artifacts/.doc-staleness.json` (machine-readable) and `doc_staleness.md` (human-readable)
-- Accumulates triggers across edits within session
-
-## Workflow Tracing (orchestrator-mcp)
+### Workflow Tracing (orchestrator-mcp)
 
 Each workflow creates a Langfuse trace with:
 - **Trace ID** = workflow_id
@@ -167,23 +61,120 @@ Each workflow creates a Langfuse trace with:
   - Latency
 - **Scores** for output quality (when Evaluator role assesses)
 
+### Manual Events
+
+Logged via `langfuse-mcp.log_event()` for:
+- Significant decisions (model escalation, budget pause)
+- Error recovery actions
+- User feedback on results
+
+## Hook Implementation
+
+### PostToolUse — log-to-langfuse.py
+
+```
+Trigger: After any MCP tool call (matcher: "mcp__*")
+Timeout: 5000ms
+Input: JSON via stdin with tool_name, tool_input, duration
+Output: None (fire-and-forget to Langfuse)
+```
+
+**Data flow:**
+1. Claude Code executes MCP tool
+2. Hook receives call metadata via stdin
+3. Script POSTs to Langfuse API (or uses SDK)
+4. Non-blocking — failure doesn't affect tool result
+
+### PostToolUse — update-task-artifact.py
+
+```
+Trigger: After Task* tool calls (matcher: "Task.*")
+Timeout: 3000ms
+Input: JSON via stdin with tool_name, tool_input, tool_response
+Output: Writes .claude/artifacts/tasks.md
+```
+
+**Data flow:**
+1. Claude Code calls TaskCreate/TaskUpdate/TaskList
+2. Hook parses task data from stdin, updates `.tasks-state.json`
+3. Renders markdown task list with status icons and agent attribution
+4. Auto-opens in VSCodium on first creation
+
+### PostToolUse — update-workflow-artifact.py
+
+```
+Trigger: After orchestrator workflow calls (matcher: "mcp__orchestrator__(run_workflow|workflow_status)")
+Timeout: 5000ms
+Input: JSON via stdin with tool_name, tool_response
+Output: Writes .claude/artifacts/workflow_status.md
+```
+
+**Data flow:**
+1. Claude Code calls `run_workflow` or `workflow_status`
+2. Hook parses workflow status from JSON response
+3. Renders workflow progress with completed steps and cost
+4. Auto-opens in VSCodium on first creation
+
+### PreToolUse — quota-check.py
+
+```
+Trigger: Before Agent tool calls (matcher: "Agent")
+Timeout: 3000ms
+Input: JSON via stdin with tool_name, tool_input (includes model param)
+Output: Warning message if quota low, or empty to proceed
+```
+
+**Data flow:**
+1. Claude Code prepares to spawn subagent
+2. Hook checks cached quota state (file-based, updated by cron)
+3. If quota critically low, returns warning message
+4. Claude Code sees warning and can adjust model selection
+
 ## Cost Reporting
 
-### get_cost_report(period)
+### get_cost_report(period, group_by)
 
-Returns session throttle state and budget usage:
+Queries Langfuse for aggregated cost data.
 
+**Example output:**
 ```json
 {
   "period": "24h",
-  "throttle": {
-    "profile": "medium",
-    "limits": {"max_opus_calls": 2, "max_sonnet_calls": 10},
-    "usage": {"opus_calls": 1, "sonnet_calls": 3, "haiku_calls": 5, "total_agent_calls": 9},
-    "remaining": {"opus": 1, "sonnet": 7}
+  "total_cost": 1.47,
+  "by_model": {
+    "claude-opus-4-6": { "calls": 12, "tokens": 45000, "cost": 0.89 },
+    "claude-sonnet-4-6": { "calls": 34, "tokens": 120000, "cost": 0.48 },
+    "claude-haiku-4-5": { "calls": 15, "tokens": 30000, "cost": 0.05 },
+    "gemini-3-flash": { "calls": 89, "tokens": 500000, "cost": 0.00 },
+    "gemini-3.1-pro": { "calls": 23, "tokens": 200000, "cost": 0.00 },
+    "gemini-2.5-flash-lite": { "calls": 45, "tokens": 100000, "cost": 0.00 }
   },
-  "langfuse": "See http://localhost:3000 for detailed traces"
+  "by_agent": {
+    "orchestrator": { "calls": 12, "cost": 0.89 },
+    "implementer": { "calls": 34, "cost": 0.48 },
+    "reviewer": { "calls": 89, "cost": 0.00 }
+  }
 }
+```
+
+### Optimization Feedback Loop
+
+```mermaid
+graph LR
+    A[Workflow executes] --> B[Langfuse traces]
+    B --> C[get_cost_report]
+    C --> D{Cost optimal?}
+    D -->|No| E[Adjust router thresholds]
+    D -->|Yes| F[Continue]
+    E --> G[Update budgets.py]
+
+    B --> H[get_agent_performance]
+    H --> I{Quality acceptable?}
+    I -->|No| J[Escalate model tier]
+    I -->|Yes| F
+
+    B --> K[DSPy optimization<br/>Phase 6]
+    K --> L[Improved prompts]
 ```
 
 ## Langfuse Self-Hosted Setup
@@ -221,14 +212,12 @@ langfuse-db:
 
 | Path | Traced By | Data Captured |
 |------|-----------|---------------|
-| Session initialization | session-gate.py + init_session | Service health, breadcrumb |
-| Agent model selection | model-gate.py | Model denied/allowed, reason |
-| Budget enforcement | throttle.py + throttle-tracker.py | Calls per tier, blocks |
+| User request → model selection | PostToolUse hook | Tool call, model chosen |
 | Workflow planning | orchestrator-mcp @observe | Task decomposition, model assignments |
 | Gemini execution | orchestrator-mcp @observe | Tokens, cost, latency, output |
-| Claude subagent execution | throttle-tracker.py | Agent calls per model tier |
+| Claude subagent execution | PostToolUse hook | Agent tool call, model param |
 | Review cycle | orchestrator-mcp @observe | Review findings, approval status |
-| Workflow completion | memory-save.py | Outcome saved for mem0 |
-| Source modifications | doc-tracker.py | Modified files, stale docs flagged |
-| Task progress | update-task-artifact.py | Task list artifact |
-| Workflow artifacts | update-workflow-artifact.py | Plans, reviews, status |
+| Memory operations | PostToolUse hook | search/add calls, hit rate |
+| Budget decisions | orchestrator-mcp @observe | Pause events, escalations |
+| Task progress | update-task-artifact.py hook | Task list artifact in `.claude/artifacts/tasks.md` |
+| Workflow artifacts | update-workflow-artifact.py hook + orchestrator artifacts.py | Plans, reviews, status in `.claude/artifacts/` |
