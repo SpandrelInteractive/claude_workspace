@@ -3,7 +3,7 @@
 ## Overview
 
 Observability is built on Langfuse (self-hosted) and integrated at three levels:
-1. **Automatic** — PostToolUse hook logs every MCP tool call
+1. **Automatic** — PostToolUse hook traces every tool call to Langfuse
 2. **Workflow** — LangGraph nodes traced via `@observe()` decorator
 3. **On-demand** — Manual queries via langfuse-mcp tools
 
@@ -12,7 +12,7 @@ Observability is built on Langfuse (self-hosted) and integrated at three levels:
 ```mermaid
 graph TB
     subgraph "Data Sources"
-        H[PostToolUse Hook<br/>~/.claude/hooks/log-to-langfuse.py]
+        H[PostToolUse Hook<br/>.claude/hooks/langfuse-trace.py]
         OM[orchestrator-mcp<br/>tracing.py @observe]
         M[Manual<br/>langfuse-mcp log_event]
     end
@@ -38,16 +38,17 @@ graph TB
 
 ## What Gets Traced
 
-### Automatic (PostToolUse Hook)
+### Automatic (PostToolUse Hook — langfuse-trace.py)
 
-Every MCP tool call is logged with:
-- **Tool name** (e.g., `mcp__gemini__analyze_files`)
-- **Timestamp**
-- **Duration** (measured by hook)
-- **Input size** (character count of arguments)
-- **Agent context** (which subagent, if any)
-
-The hook script receives tool call metadata via stdin from Claude Code's hook system.
+**Every** tool call is traced (matcher: `.*`), not just MCP tools. Each trace includes:
+- **Trace name** — `{agent}:{action}` (e.g., `orchestrator:read`, `gemini:analyze_files`, `general-purpose:agent-call`)
+- **Tool classification:**
+  - `Agent` calls → agent=subagent_type, model=model param, action=description
+  - `mcp__*` calls → agent=server name, action=tool name
+  - `Read/Edit/Write/Glob/Grep` → action=tool name, file basename in metadata
+  - `Bash` → action=description (sanitized, never exposes full command or credentials)
+- **Generation span** — Added for Agent calls with explicit model param (enables model-level cost grouping)
+- **Fire-and-forget** — Uses stdlib `urllib` POST to Langfuse REST API; failures don't block tool execution
 
 ### Workflow Tracing (orchestrator-mcp)
 
@@ -70,20 +71,31 @@ Logged via `langfuse-mcp.log_event()` for:
 
 ## Hook Implementation
 
-### PostToolUse — log-to-langfuse.py
+### PostToolUse — langfuse-trace.py
 
 ```
-Trigger: After any MCP tool call (matcher: "mcp__*")
-Timeout: 5000ms
-Input: JSON via stdin with tool_name, tool_input, duration
-Output: None (fire-and-forget to Langfuse)
+Trigger: After ALL tool calls (matcher: ".*")
+Timeout: 2000ms
+Input: JSON via stdin with tool_name, tool_input
+Output: None (fire-and-forget HTTP POST to Langfuse)
+Skip: ToolSearch (too noisy / internal)
 ```
 
 **Data flow:**
-1. Claude Code executes MCP tool
+1. Claude Code executes any tool
 2. Hook receives call metadata via stdin
-3. Script POSTs to Langfuse API (or uses SDK)
-4. Non-blocking — failure doesn't affect tool result
+3. Classifies tool call into agent/action/model
+4. POSTs trace (+ optional generation span) to Langfuse REST API
+5. Non-blocking — `urllib.urlopen` with 2s timeout, exceptions swallowed
+
+**Trace naming convention:**
+| Tool Type | Trace Name | Example |
+|-----------|-----------|---------|
+| Agent | `{subagent_type}:{description}` | `Explore:Find config files` |
+| MCP | `{server}:{tool}` | `gemini:analyze_files` |
+| Read/Edit/Write | `orchestrator:{tool}` | `orchestrator:read` |
+| Bash | `orchestrator:{description}` | `orchestrator:Check Langfuse health` |
+| Glob/Grep | `orchestrator:{tool}` | `orchestrator:glob` |
 
 ### PostToolUse — update-task-artifact.py
 
@@ -115,20 +127,24 @@ Output: Writes .claude/artifacts/workflow_status.md
 3. Renders workflow progress with completed steps and cost
 4. Auto-opens in VSCodium on first creation
 
-### PreToolUse — quota-check.py
+### PreToolUse — pending-actions.py
 
 ```
-Trigger: Before Agent tool calls (matcher: "Agent")
-Timeout: 3000ms
-Input: JSON via stdin with tool_name, tool_input (includes model param)
-Output: Warning message if quota low, or empty to proceed
+Trigger: Before ALL tool calls (matcher: ".*")
+Timeout: 1000ms
+Cooldown: 10 minutes between reminders
+Output: Non-blocking stderr message listing pending actions
 ```
+
+**Checks for:**
+1. **Pending memory saves** — `.pending-memory-save.json` queue from workflow completions
+2. **Doc staleness** — `.doc-staleness.json` tracker from source file edits
 
 **Data flow:**
-1. Claude Code prepares to spawn subagent
-2. Hook checks cached quota state (file-based, updated by cron)
-3. If quota critically low, returns warning message
-4. Claude Code sees warning and can adjust model selection
+1. Hook runs on every tool call but checks cooldown first (10-min rate limit)
+2. Reads pending-memory and doc-staleness state files
+3. If actionable items exist, outputs reminder to stderr
+4. Claude processes the items at next natural pause
 
 ## Cost Reporting
 
@@ -212,12 +228,13 @@ langfuse-db:
 
 | Path | Traced By | Data Captured |
 |------|-----------|---------------|
-| User request → model selection | PostToolUse hook | Tool call, model chosen |
+| User request → model selection | langfuse-trace.py hook | Tool call, model chosen |
 | Workflow planning | orchestrator-mcp @observe | Task decomposition, model assignments |
 | Gemini execution | orchestrator-mcp @observe | Tokens, cost, latency, output |
-| Claude subagent execution | PostToolUse hook | Agent tool call, model param |
+| Claude subagent execution | langfuse-trace.py hook | Agent tool call, model param, subagent type |
 | Review cycle | orchestrator-mcp @observe | Review findings, approval status |
-| Memory operations | PostToolUse hook | search/add calls, hit rate |
+| Memory operations | langfuse-trace.py hook | search/add calls |
 | Budget decisions | orchestrator-mcp @observe | Pause events, escalations |
 | Task progress | update-task-artifact.py hook | Task list artifact in `.claude/artifacts/tasks.md` |
 | Workflow artifacts | update-workflow-artifact.py hook + orchestrator artifacts.py | Plans, reviews, status in `.claude/artifacts/` |
+| Pending actions | pending-actions.py hook | Memory queue + doc staleness reminders |

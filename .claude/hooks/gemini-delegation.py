@@ -20,7 +20,7 @@ _COOLDOWN_SECONDS = 300  # 5 minutes between blocks
 
 def _state_path() -> str:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-    return os.path.join(project_dir, ".claude", "artifacts", ".throttle-state.json")
+    return os.path.join(project_dir, ".claude", "artifacts", ".read-tracker.json")
 
 
 def _load_state() -> dict:
@@ -32,7 +32,7 @@ def _load_state() -> dict:
             return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
-    return {}
+    return {"date": time.strftime("%Y-%m-%d"), "files_read": [], "last_delegation_block": 0}
 
 
 def _save_state(state: dict):
@@ -56,9 +56,6 @@ def main():
         sys.exit(0)
 
     state = _load_state()
-    if not state:
-        sys.exit(0)
-
     files_read = state.get("files_read", [])
     last_delegation_block = state.get("last_delegation_block", 0)
 

@@ -8,6 +8,11 @@
             "type": "command",
             "command": "python3 .claude/hooks/session-gate.py",
             "timeout": 2000
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/pending-actions.py",
+            "timeout": 1000
           }
         ]
       },
@@ -43,6 +48,16 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/langfuse-trace.py",
+            "timeout": 2000
+          }
+        ]
+      },
       {
         "matcher": "Agent",
         "hooks": [
