@@ -32,7 +32,7 @@ curl -s http://localhost:11434/api/tags | head -5  # should respond
 curl -s http://localhost:1338/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('PASS' if d['status']=='ok' else 'FAIL')"
 
 # V-1.2: Proxy velocity endpoint works
-curl -s http://localhost:1338/velocity | python3 -c "import sys,json; d=json.load(sys.stdin); print('PASS' if '5min' in d else 'FAIL')"
+curl -s http://localhost:1338/velocity | python3 -c "import sys,json; d=json.load(sys.stdin); print('PASS' if '5min' in d.get('velocity',{}) else 'FAIL')"
 
 # V-1.3: Qdrant responds
 curl -s http://localhost:6333/collections | python3 -c "import sys,json; json.load(sys.stdin); print('PASS')"
