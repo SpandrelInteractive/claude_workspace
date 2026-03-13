@@ -67,7 +67,7 @@ The framework is split into two layers:
 
 | Service | Endpoint | Managed By |
 |---------|----------|------------|
-| Proxy v2 | `localhost:1338` | PM2 (`antigravity-v2`) |
+| Proxy v2 | `localhost:1338` | Docker Compose (`proxy`) |
 | Langfuse | `localhost:3000` | Docker Compose |
 | Qdrant | `localhost:6333` | Docker Compose |
 | Ollama | `localhost:11434` | System service |

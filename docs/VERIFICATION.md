@@ -15,7 +15,7 @@ Before starting, ensure infrastructure is running:
 docker compose -f /path/to/ai-infra/docker-compose.yml up -d
 
 # Proxy
-pm2 status antigravity-v2  # should show "online"
+docker ps --format '{{.Names}}' | grep proxy  # should show ai-infra-proxy-1
 
 # Ollama
 curl -s http://localhost:11434/api/tags | head -5  # should respond
@@ -49,8 +49,8 @@ docker ps --format '{{.Names}}' | grep -q otel-collector && echo PASS || echo FA
 # V-1.7: OTEL bridge running
 docker ps --format '{{.Names}}' | grep -q otel-bridge && echo PASS || echo FAIL
 
-# V-1.8: PM2 proxy healthy
-pm2 show antigravity-v2 --no-color 2>&1 | grep -q 'online' && echo PASS || echo FAIL
+# V-1.8: Proxy container healthy
+docker ps --format '{{.Names}} {{.Status}}' | grep proxy | grep -q 'Up' && echo PASS || echo FAIL
 ```
 
 **Expected:** All 8 PASS
@@ -400,13 +400,13 @@ Then call any tool.
 
 ### V-11.2: Proxy down
 ```bash
-pm2 stop antigravity-v2
+docker stop ai-infra-proxy-1
 ```
 Then call `init_session`.
 **Expected:** Returns `{status: "blocked"}` with proxy listed in blockers and fix command
 
 ```bash
-pm2 start antigravity-v2  # restore
+docker start ai-infra-proxy-1  # restore
 ```
 
 ### V-11.3: Langfuse down

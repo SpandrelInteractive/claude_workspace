@@ -78,7 +78,7 @@ my-project/
 
 The [AI Infrastructure](https://github.com/SpandrelInteractive/ai-infra) repo must be running:
 - Docker services: Qdrant, Neo4j, Ollama, Langfuse, OTEL Collector/Bridge
-- Antigravity proxy v2 on localhost:1338 (PM2)
+- Antigravity proxy v2 on localhost:1338 (Docker Compose)
 - MCP servers: orchestrator-mcp, gemini-delegate, mem0-mcp, langfuse-mcp
 
 ## Documentation

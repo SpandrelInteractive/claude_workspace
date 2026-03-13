@@ -471,7 +471,7 @@ services:
   otel-bridge:   # (internal) — OTEL→Langfuse translator
 ```
 
-Proxy runs outside Docker via PM2 as `antigravity-v2` on port 1338.
+Proxy runs in Docker Compose as the `proxy` service on port 1338.
 
 ---
 

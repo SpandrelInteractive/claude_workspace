@@ -9,7 +9,7 @@ This guide explains how to instantiate Part 2 (project customization) for any pr
 Before setting up a project, ensure Part 1 is operational:
 
 - [ ] Docker services running: Qdrant, Neo4j, Ollama, Langfuse, Langfuse-DB
-- [ ] antigravity-proxy v2 running on localhost:1338 (managed by PM2)
+- [ ] antigravity-proxy v2 running on localhost:1338 (Docker Compose)
 - [ ] MCP servers installed: orchestrator-mcp, gemini-delegate, mem0-mcp, langfuse-mcp
 - [ ] Generic skills installed in `~/.claude/skills/`
 - [ ] Hooks installed in `~/.claude/hooks/`
