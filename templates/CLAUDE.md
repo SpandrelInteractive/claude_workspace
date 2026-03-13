@@ -2,31 +2,20 @@
 
 ## Documentation
 
-Detailed guides live in `.claude/docs/`. Read them before asking the user for context.
+Framework guides live in `.claude/framework/docs/`. Project-specific guide lives in `.claude/docs/`.
 
-| Guide | Contents |
-|-------|----------|
-| `usage-guide.md` | Generic framework: MCP servers, agent roles, routing, cost optimization, troubleshooting |
-| `{{PROJECT_ID}}-guide.md` | Project-specific: domain entities, architecture rules, workflows, review checklist |
-| `project-setup-guide.md` | How to set up a new project instance from scratch |
-| `architecture-overview.md` | System diagrams and component interactions |
-| `agent-roles.md` | Role definitions and escalation paths |
-| `mcp-servers.md` | MCP server internals and configuration |
-| `workflows.md` | LangGraph workflow state machines |
-| `observability.md` | Langfuse tracing and hooks |
-| `skills-guide.md` | Skills ecosystem and creation |
-| `rate-limiting.md` | Budget caps and rate limit strategy |
-| `artifacts.md` | Artifact system: types, lifecycle, hooks, renderers |
+- **Framework index:** [`.claude/framework/docs/INDEX.md`](.claude/framework/docs/INDEX.md)
+- **Project guide:** `.claude/docs/{{PROJECT_ID}}-guide.md`
 
 ## CLI Tools
 
-Scripts in `.claude/tools/` are available for use via Bash.
+Scripts in `.claude/framework/tools/` are available for use via Bash.
 
 | Tool | Usage |
 |------|-------|
-| `reset-mcps.sh` | Kill MCP server processes. **Killing removes tools for the rest of the session** — Claude Code does NOT auto-reconnect. Use `--check` to inspect health without killing. Only kill when the server is already broken and you plan to restart Claude Code afterward. |
-| `pull-framework.sh` | Pull MAO framework updates from the claude_workspace template into this project. Syncs hooks, docs, tools, and generic skills. Preserves project-specific files (.mcp.json, project skills, Bash permissions). Run `.claude/tools/pull-framework.sh [path-to-template]`. |
-| `sync-mao.sh` | Push framework changes from this project back to the claude_workspace template. Use when developing framework improvements in a project workspace. |
+| `reset-mcps.sh` | Kill MCP server processes. **Killing removes tools for the rest of the session** — Claude Code does NOT auto-reconnect. Use `--check` to inspect health without killing. |
+
+To pull framework updates: `git subtree pull --prefix=.claude/framework <mao-repo-path> main --squash`
 
 ## Memory Protocol
 
@@ -75,9 +64,12 @@ After major code changes?
 6. Gemini 3.1 Pro — long-context analysis when Claude context is insufficient
 
 ### Observability
-- All workflow executions are traced in Langfuse (http://localhost:3000)
-- Check `get_cost_report` periodically to optimize routing
-- PostToolUse hook logs MCP calls automatically
+- Three tracing sources feed Langfuse (http://localhost:3000):
+  1. `post-tool-trace.py` hook — traces all Claude Code tool calls
+  2. Proxy middleware (port 1338) — traces all Gemini API calls with token counts
+  3. OTEL bridge — captures Claude API calls via OpenTelemetry
+- All traces share `session_id` for cross-source correlation
+- Check `get_quota_report` for velocity-based quota status
 
 ### Memory Protocol
 - search_memories BEFORE asking user for project context
@@ -124,5 +116,4 @@ Development rules and coding standards will be finalized with input from the cli
 
 - **Architecture**: `docs/TDD.md` and `docs/ADRs/` for technical decisions
 - **Requirements**: `docs/PRD.md` for business rules and feature scope
-- **Gaps**: `docs/gap-assessment.md` for known unknowns and open questions
 - **Conventions**: `.claude/docs/{{PROJECT_ID}}-guide.md` for current patterns and constraints

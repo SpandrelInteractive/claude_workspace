@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/pre-tool-gate.py",
+            "command": "python3 .claude/framework/hooks/pre-tool-gate.py",
             "timeout": 2000
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/post-tool-trace.py",
+            "command": "python3 .claude/framework/hooks/post-tool-trace.py",
             "timeout": 5000
           }
         ]
