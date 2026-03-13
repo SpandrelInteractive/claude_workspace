@@ -24,7 +24,9 @@ Scripts in `.claude/tools/` are available for use via Bash.
 
 | Tool | Usage |
 |------|-------|
-| `reset-mcps.sh` | Kill MCP server processes so Claude Code auto-restarts them. Run `.claude/tools/reset-mcps.sh` to reset all, or `.claude/tools/reset-mcps.sh mem0 gemini` for specific servers. Use when an MCP server is unresponsive or returning errors. |
+| `reset-mcps.sh` | Kill MCP server processes. **Killing removes tools for the rest of the session** — Claude Code does NOT auto-reconnect. Use `--check` to inspect health without killing. Only kill when the server is already broken and you plan to restart Claude Code afterward. |
+| `pull-framework.sh` | Pull MAO framework updates from the claude_workspace template into this project. Syncs hooks, docs, tools, and generic skills. Preserves project-specific files (.mcp.json, project skills, Bash permissions). Run `.claude/tools/pull-framework.sh [path-to-template]`. |
+| `sync-mao.sh` | Push framework changes from this project back to the claude_workspace template. Use when developing framework improvements in a project workspace. |
 
 ## Memory Protocol
 
