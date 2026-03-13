@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Reset MCP servers by killing their processes.
-# Claude Code auto-restarts MCP servers on next tool call.
+#
+# WARNING: Killing an MCP server mid-session permanently removes its tools
+# for the rest of the Claude Code session. Tools will NOT auto-reconnect.
+# Only use this when you're prepared to restart Claude Code afterward,
+# or when the server is already broken and you have nothing to lose.
 #
 # Usage:
-#   reset-mcps.sh              # reset all MCP servers
-#   reset-mcps.sh mem0 gemini  # reset specific servers only
+#   reset-mcps.sh                     # reset all MCP servers (destructive)
+#   reset-mcps.sh mem0 gemini         # reset specific servers only
+#   reset-mcps.sh --check             # check server health without killing
+#   reset-mcps.sh --check langfuse    # check specific server health
 
 set -euo pipefail
 
@@ -49,16 +55,60 @@ reset_server() {
     pgrep -f "$pattern" | xargs kill -9 2>/dev/null || true
   fi
 
-  echo "[$name] Reset complete (will auto-restart on next tool call)"
+  echo "[$name] Reset complete (restart Claude Code to restore tools)"
 }
 
-# Determine which servers to reset
+check_server() {
+  local name="$1"
+  local pattern="${SERVER_PATTERNS[$name]:-}"
+
+  if [[ -z "$pattern" ]]; then
+    echo "[$name] Unknown server"
+    return 1
+  fi
+
+  local pids
+  pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+
+  if [[ -z "$pids" ]]; then
+    echo "[$name] NOT RUNNING"
+    return 1
+  fi
+
+  local pid_count
+  pid_count=$(echo "$pids" | wc -l)
+  echo "[$name] RUNNING ($pid_count processes)"
+  return 0
+}
+
+# Parse flags
+CHECK_ONLY=false
+if [[ "${1:-}" == "--check" ]]; then
+  CHECK_ONLY=true
+  shift
+fi
+
+# Determine which servers to target
 if [[ $# -eq 0 ]]; then
   targets=("${!SERVER_PATTERNS[@]}")
 else
   targets=("$@")
 fi
 
+if $CHECK_ONLY; then
+  echo "MCP server health check:"
+  echo "---"
+  for server in "${targets[@]}"; do
+    check_server "$server" || true
+  done
+  echo "---"
+  exit 0
+fi
+
+# Destructive path — warn
+echo "⚠  WARNING: Killing MCP servers removes their tools for this session."
+echo "   You will need to restart Claude Code to get them back."
+echo ""
 echo "Resetting MCP servers: ${targets[*]}"
 echo "---"
 
@@ -67,4 +117,4 @@ for server in "${targets[@]}"; do
 done
 
 echo "---"
-echo "Done. MCP servers will reconnect on next tool call."
+echo "Done. Restart Claude Code to restore tools."

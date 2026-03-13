@@ -23,7 +23,7 @@ graph TB
     end
 
     subgraph "Infrastructure"
-        PROXY[antigravity-proxy<br/>:1337]
+        PROXY[antigravity-proxy v2<br/>:1338 + Langfuse middleware]
         LF[Langfuse<br/>:3000]
         LFDB[Langfuse Postgres<br/>:5432]
         QD[Qdrant<br/>:6333]
@@ -91,7 +91,7 @@ General questions with large context. No tool use needed.
     "args": ["run", "--directory", "~/projects/ai-infra/gemini-delegate", "gemini-delegate"],
     "env": {
       "PROJECT_ROOT": "<project-root>",
-      "ANTHROPIC_BASE_URL": "http://localhost:1337",
+      "ANTHROPIC_BASE_URL": "http://localhost:1338",
       "ANTHROPIC_API_KEY": "dummy-key",
       "GEMINI_PRO_MODEL": "gemini-3-flash",
       "GEMINI_FLASH_MODEL": "gemini-2.5-flash-lite"
@@ -139,7 +139,7 @@ Get all relationships for a named entity from the knowledge graph.
     "args": ["run", "--directory", "~/projects/ai-infra/mem0-mcp", "mem0-mcp"],
     "env": {
       "MEM0_APP_ID": "{{PROJECT_ID}}",
-      "ANTHROPIC_BASE_URL": "http://localhost:1337",
+      "ANTHROPIC_BASE_URL": "http://localhost:1338",
       "ANTHROPIC_API_KEY": "dummy-key",
       "MEM0_ENABLE_GRAPH": "true"
     }
@@ -177,10 +177,10 @@ Cancel a running workflow with reason.
 Poll proxy health and account limits.
 - **Returns:** `{ models: { <model>: { available, rpm_remaining, tpm_remaining } }, recommendation }`
 
-#### `get_cost_report(period: str = "24h") -> dict`
-Cost summary from Langfuse by agent/model/workflow.
-- **period:** "1h", "24h", "7d", "30d"
-- **Returns:** `{ total_cost, by_model: {...}, by_agent: {...}, by_workflow: {...} }`
+#### `get_quota_report() -> dict`
+Velocity-based quota report combining proxy data and session throttle state.
+- **Returns:** `{ velocity, model_limits, session_budget, risk }`
+- **Sources:** Proxy `/velocity` endpoint, `/health` endpoint, session state file
 
 #### `optimize_prompts(role: str, examples_count: int = 10) -> dict`
 DSPy prompt optimization for a role using workflow history. (Phase 6)
@@ -192,7 +192,7 @@ DSPy prompt optimization for a role using workflow history. (Phase 6)
     "command": "uv",
     "args": ["run", "--directory", "~/projects/ai-infra/orchestrator-mcp", "orchestrator-mcp"],
     "env": {
-      "ANTHROPIC_BASE_URL": "http://localhost:1337",
+      "ANTHROPIC_BASE_URL": "http://localhost:1338",
       "ANTHROPIC_API_KEY": "dummy-key",
       "LANGFUSE_HOST": "http://localhost:3000",
       "LANGFUSE_PUBLIC_KEY": "<from-langfuse-ui>",
@@ -209,20 +209,23 @@ DSPy prompt optimization for a role using workflow history. (Phase 6)
 **Entry point:** `langfuse_mcp.server:main`
 **Run:** `uv run --directory ~/projects/ai-infra/langfuse-mcp langfuse-mcp`
 
-### Tools
+### Tools (Pure Analytics — Read-Only)
 
-#### `log_event(agent: str, action: str, model: str = "", tokens: int = 0, cost: float = 0.0, metadata: dict = {}) -> dict`
-Log an agent action to Langfuse as a trace event.
-
-#### `get_cost_report(period: str = "24h", group_by: str = "model") -> dict`
-Cost breakdown from Langfuse.
-- **group_by:** "model", "agent", "workflow"
+#### `get_cost_report(period: str = "24h", group_by: str = "source") -> dict`
+Aggregated cost and activity breakdown from Langfuse traces. Real data from all 3 sources.
+- **group_by:** "source", "model", "agent"
+- **Returns:** `{ total_traces, total_cost_usd, breakdown, model_tokens }`
 
 #### `get_agent_performance(agent_id: str, period: str = "24h") -> dict`
-Agent metrics: success rate, avg latency, error rate.
+Performance metrics for an agent role: action breakdown, models used, avg latency.
 
-#### `get_traces(workflow_id: str) -> list[dict]`
-Full trace for a workflow — all steps, models, costs.
+#### `get_traces(trace_id: str) -> dict`
+Full trace details with all observations (generations/spans), token counts, and costs.
+
+#### `get_session_summary(session_id: str = "") -> dict`
+Session-level summary combining traces from all 3 sources (hooks, proxy, OTEL).
+- Auto-reads `~/.claude-session-id` if no session_id provided
+- **Returns:** `{ total_traces, sources, top_tools, models, timeline }`
 
 ### Configuration
 ```json

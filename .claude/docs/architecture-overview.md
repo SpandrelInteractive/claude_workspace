@@ -28,7 +28,8 @@ graph TB
     end
 
     subgraph "External Services"
-        PROXY[antigravity-claude-proxy<br/>localhost:1337]
+        PROXY[antigravity-proxy v2<br/>localhost:1338 + Langfuse MW]
+        OTEL[OTEL Collector + Bridge<br/>localhost:4318]
         LF[Langfuse<br/>localhost:3000]
         QD[Qdrant<br/>localhost:6333]
         N4J[Neo4j<br/>localhost:7687]
@@ -127,22 +128,23 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph "Collection"
-        H1[PostToolUse Hook] -->|"auto-log MCP calls"| LF[Langfuse]
-        H2[PreToolUse Hook] -->|"quota check"| QG[Quota Guard]
-        OM[Orchestrator MCP] -->|"@observe decorator"| LF
-        WF[Workflow steps] -->|"trace per node"| LF
+    subgraph "Collection (3 sources, session-linked)"
+        H1[post-tool-trace.py] -->|"all tool calls"| LF[Langfuse]
+        PM[Proxy Middleware<br/>:1338] -->|"Gemini calls + tokens"| LF
+        OB[OTEL Bridge] -->|"Claude API calls"| LF
+        H2[pre-tool-gate.py] -->|"budget + model enforcement"| QG[Session State]
     end
 
-    subgraph "Analysis"
+    subgraph "Analytics (langfuse-mcp)"
         LF --> CR[get_cost_report]
         LF --> AP[get_agent_performance]
+        LF --> SS[get_session_summary]
         LF --> TR[get_traces]
     end
 
-    subgraph "Optimization"
-        CR --> RM[Route optimization<br/>Adjust model selection]
-        AP --> PO[DSPy prompt optimization<br/>Phase 6]
+    subgraph "Quota (orchestrator-mcp)"
+        PM -->|"/velocity, /health"| QR[get_quota_report]
+        QG --> QR
     end
 ```
 
@@ -174,7 +176,7 @@ graph TD
 | mem0-mcp | qdrant, neo4j, ollama, proxy | All agents (persistent memory) |
 | langfuse-mcp | langfuse server | Claude Code (observability) |
 | sequential-thinking | (self-contained) | Architect, Orchestrator roles |
-| Hooks | langfuse-mcp, orchestrator-mcp | Auto-logging, quota guardrails, artifact generation |
+| Hooks (2 files) | langfuse, session state, artifacts | Pre: session gate, budget, model, delegation. Post: trace, throttle, tasks, workflows, memory, docs |
 | Skills | (markdown files) | Claude Code (behavioral guidance) |
 | Artifacts | orchestrator-mcp, hooks, skills | User (reviewable deliverables: plans, reviews, status) |
 
@@ -185,5 +187,5 @@ graph TD
 3. **Hybrid execution** — Gemini calls happen inside orchestrator-mcp (PydanticAI); Claude calls return instructions for Agent tool
 4. **SQLite checkpointing** — LangGraph state persists across interruptions; no external DB needed
 5. **Structured outputs** — PydanticAI validates all agent responses against schemas; retries on failure
-6. **4-layer rate limiting** — Proxy, orchestrator, cron, and per-workflow budget caps
+6. **Velocity-based quota management** — Proxy tracks call rates; hooks enforce per-session budgets; get_quota_report combines both with lockout risk assessment
 7. **Artifact-driven transparency** — Workflows generate structured markdown deliverables at phase transitions; users review via inline feedback, not raw logs

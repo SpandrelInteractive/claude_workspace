@@ -6,43 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/session-gate.py",
+            "command": "python3 .claude/hooks/pre-tool-gate.py",
             "timeout": 2000
-          },
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/pending-actions.py",
-            "timeout": 1000
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/throttle.py",
-            "timeout": 1000
-          },
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/model-gate.py",
-            "timeout": 1000
-          },
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/task-gate.py",
-            "timeout": 1000
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/gemini-delegation.py",
-            "timeout": 1000
           }
         ]
       }
@@ -53,53 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/langfuse-trace.py",
-            "timeout": 2000
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/throttle-tracker.py",
-            "timeout": 1000
-          }
-        ]
-      },
-      {
-        "matcher": "Task.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/update-task-artifact.py",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__orchestrator__(run_workflow|workflow_status)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/update-workflow-artifact.py",
+            "command": "python3 .claude/hooks/post-tool-trace.py",
             "timeout": 5000
-          },
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/memory-save.py",
-            "timeout": 2000
-          }
-        ]
-      },
-      {
-        "matcher": "(Edit|Write)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/doc-tracker.py",
-            "timeout": 1000
           }
         ]
       }
@@ -125,18 +45,12 @@
       "mcp__orchestrator__list_workflows",
       "mcp__orchestrator__cancel_workflow",
       "mcp__orchestrator__get_quota_state",
-      "mcp__orchestrator__get_cost_report",
+      "mcp__orchestrator__get_quota_report",
       "mcp__orchestrator__optimize_prompts",
-      "mcp__langfuse__log_event",
       "mcp__langfuse__get_cost_report",
       "mcp__langfuse__get_agent_performance",
       "mcp__langfuse__get_traces",
-      "Bash(docker ps --format '{{.Names}} {{.Status}}' 2>&1)",
-      "Bash(docker compose -f {{INFRA_PATH}}/docker-compose.yml up -d 2>&1)",
-      "Bash(curl -s http://localhost:1337/v1/models 2>&1 | head -50)",
-      "Bash(curl -s http://localhost:3000 2>&1 | head -5)",
-      "Bash(curl -s http://localhost:6333/collections 2>/dev/null | head -5 || echo 'Qdrant not reachable')",
-      "Bash(curl -s http://localhost:11434/api/tags 2>/dev/null | head -5 || echo 'Ollama not reachable')"
+      "mcp__langfuse__get_session_summary"
     ]
   },
   "enableAllProjectMcpServers": true,

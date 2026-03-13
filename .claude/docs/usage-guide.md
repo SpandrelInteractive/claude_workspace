@@ -106,7 +106,7 @@ Manages multi-step stateful workflows via LangGraph with SQLite checkpointing.
 | `list_workflows` | See all active/completed workflows |
 | `cancel_workflow` | Abort a running workflow |
 | `get_quota_state` | **Always** before spawning expensive subagents |
-| `get_cost_report` | Periodically, to check spending and optimize routing |
+| `get_quota_report` | Periodically, to check velocity, model limits, and lockout risk |
 
 **Generic workflow types:**
 
@@ -125,20 +125,20 @@ Projects can define additional workflow types in their `<project>-workflows` ski
 
 ---
 
-### langfuse-mcp — Observability Bridge
+### langfuse-mcp — Observability Analytics (Read-Only)
 
-Reads traces and metrics from the project's Langfuse instance.
+Pure analytics engine over Langfuse traces. All tracing is handled by hooks and proxy middleware — this server only reads.
 
 **Tools:**
 
 | Tool | When to Use |
 |------|-------------|
-| `log_event` | Record an agent action or decision manually |
-| `get_cost_report` | Analyze spending by model, time period, or workflow |
-| `get_agent_performance` | View agent metrics (latency, success rate) |
-| `get_traces` | Get full trace for a workflow (all steps, models, costs) |
+| `get_cost_report` | Analyze spending by source, model, or agent for a time period |
+| `get_agent_performance` | View agent metrics (action breakdown, models used, avg latency) |
+| `get_traces` | Get full trace with all observations (generations/spans, token counts) |
+| `get_session_summary` | Session-level overview across all 3 trace sources (hooks, proxy, OTEL) |
 
-**Note:** Most logging is automatic via the `PostToolUse` hook — you rarely need to call `log_event` manually.
+**Note:** Tracing is fully automatic — hooks and proxy middleware handle all ingestion. This server is read-only analytics.
 
 ---
 
@@ -203,16 +203,16 @@ See the project-specific guide for details on these skills.
 
 ## 4. Hooks (Automatic)
 
-These run automatically — no manual invocation needed:
+Two consolidated hooks run automatically — no manual invocation needed:
 
 | Hook | Trigger | Effect |
 |------|---------|--------|
-| `log-to-langfuse.py` | PostToolUse (`mcp__*`) | Logs every MCP tool call to Langfuse |
-| `quota-check.py` | PreToolUse (`Agent`) | Warns/blocks before expensive Agent spawns |
-| `update-task-artifact.py` | PostToolUse (`Task*`) | Renders live task list to `.claude/artifacts/tasks.md` |
-| `update-workflow-artifact.py` | PostToolUse (`mcp__orchestrator__*`) | Renders workflow status to `.claude/artifacts/workflow_status.md` |
+| `pre-tool-gate.py` | PreToolUse (`.*`) | Session gate, budget enforcement, model selection, Gemini delegation suggestions |
+| `post-tool-trace.py` | PostToolUse (`.*`) | Langfuse tracing, throttle tracking, task/workflow artifact updates, memory queue, doc staleness |
 
-Hooks have a 3-5 second timeout and are non-blocking on failure.
+Each hook internally dispatches to multiple handlers. See `observability.md` for the full dispatch table.
+
+Hooks have a 2-5 second timeout and are non-blocking on failure.
 
 ### Artifact Skills (User-Invoked)
 
@@ -275,7 +275,7 @@ Each project extends the generic framework with:
 4. **`.claude/skills/<project>-patterns/`** — Domain knowledge skill.
 5. **`.claude/skills/<project>-workflows/`** — Workflow definitions skill.
 6. **`.claude/settings.local.json`** — MCP permissions and artifact hooks.
-7. **`.claude/hooks/`** — Artifact generation hooks (`update-task-artifact.py`, `update-workflow-artifact.py`).
+7. **`.claude/hooks/`** — Two consolidated hooks (`pre-tool-gate.py`, `post-tool-trace.py`) + shared `lib/`.
 8. **`.claude/artifacts/`** — Generated deliverables: task plans, implementation plans, reviews, walkthroughs.
 9. **`.gemini-index`** — Codebase digest (rebuilt via `refresh_index`).
 10. **mem0 memories** — Seeded entity relationships and project facts.
@@ -290,7 +290,7 @@ See `project-setup-guide.md` for step-by-step instructions on creating a new pro
 |---------|----------|
 | MCP server not connecting | Check `uv run` path and env vars in `.mcp.json` |
 | mem0 search returns nothing | Verify `MEM0_APP_ID` matches in `.envrc` and `.mcp.json` |
-| Gemini calls failing | Check proxy at `localhost:1337/health` |
+| Gemini calls failing | Check proxy at `localhost:1338/health` |
 | Langfuse empty | Verify API keys in `.mcp.json`, check hook is registered |
 | Neo4j Cypher errors | Use underscores not hyphens in relationship names |
 | PointStruct validation errors | Stale entries with null vectors — non-blocking, ignore or prune |
@@ -303,7 +303,7 @@ See `project-setup-guide.md` for step-by-step instructions on creating a new pro
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Antigravity Proxy | `http://localhost:1337` | Routes LLM calls to Gemini/Claude |
+| Antigravity Proxy v2 | `http://localhost:1338` | Routes LLM calls to Gemini + Langfuse tracing middleware |
 | Langfuse | `http://localhost:3000` | Observability dashboard |
 | Qdrant | `http://localhost:6333` | Vector store for mem0 |
 | Neo4j | `http://localhost:7687` (bolt) / `:7474` (browser) | Graph store for mem0 |

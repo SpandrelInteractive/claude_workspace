@@ -9,7 +9,7 @@ This guide explains how to instantiate Part 2 (project customization) for any pr
 Before setting up a project, ensure Part 1 is operational:
 
 - [ ] Docker services running: Qdrant, Neo4j, Ollama, Langfuse, Langfuse-DB
-- [ ] antigravity-claude-proxy running on localhost:1337
+- [ ] antigravity-proxy v2 running on localhost:1338 (managed by PM2)
 - [ ] MCP servers installed: orchestrator-mcp, gemini-delegate, mem0-mcp, langfuse-mcp
 - [ ] Generic skills installed in `~/.claude/skills/`
 - [ ] Hooks installed in `~/.claude/hooks/`
@@ -42,7 +42,7 @@ Create `<project>/.mcp.json`:
       "args": ["run", "--directory", "/home/tohigu/projects/ai-infra/mem0-mcp", "mem0-mcp"],
       "env": {
         "MEM0_APP_ID": "<project-id>",
-        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_BASE_URL": "http://localhost:1338",
         "ANTHROPIC_API_KEY": "dummy-key",
         "MEM0_ENABLE_GRAPH": "true"
       }
@@ -52,7 +52,7 @@ Create `<project>/.mcp.json`:
       "args": ["run", "--directory", "/home/tohigu/projects/ai-infra/gemini-delegate", "gemini-delegate"],
       "env": {
         "PROJECT_ROOT": "<project-absolute-path>",
-        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_BASE_URL": "http://localhost:1338",
         "ANTHROPIC_API_KEY": "dummy-key",
         "GEMINI_PRO_MODEL": "gemini-3-flash",
         "GEMINI_FLASH_MODEL": "gemini-2.5-flash-lite"
@@ -62,7 +62,7 @@ Create `<project>/.mcp.json`:
       "command": "uv",
       "args": ["run", "--directory", "/home/tohigu/projects/ai-infra/orchestrator-mcp", "orchestrator-mcp"],
       "env": {
-        "ANTHROPIC_BASE_URL": "http://localhost:1337",
+        "ANTHROPIC_BASE_URL": "http://localhost:1338",
         "ANTHROPIC_API_KEY": "dummy-key",
         "LANGFUSE_HOST": "http://localhost:3000",
         "LANGFUSE_PUBLIC_KEY": "<key>",
@@ -160,14 +160,15 @@ Add the orchestration section to your project's CLAUDE.md. Copy the generic sect
 - Reference: [paths to ADRs, PRD, TDD]
 ```
 
-### 6. Install Artifact Hooks and Skills
+### 6. Install Hooks and Skills
 
-Copy the artifact hooks and skills from the workspace template:
+Copy the consolidated hooks and shared library from the workspace template:
 
 ```bash
-# Hooks — generate artifact files from tool responses
-cp claude_workspace/.claude/hooks/update-task-artifact.py <project>/.claude/hooks/
-cp claude_workspace/.claude/hooks/update-workflow-artifact.py <project>/.claude/hooks/
+# Hooks — 2 consolidated hooks + shared library
+cp claude_workspace/.claude/hooks/pre-tool-gate.py <project>/.claude/hooks/
+cp claude_workspace/.claude/hooks/post-tool-trace.py <project>/.claude/hooks/
+cp -r claude_workspace/.claude/hooks/lib/ <project>/.claude/hooks/lib/
 chmod +x <project>/.claude/hooks/*.py
 
 # Skills — user-invokable artifact generators
@@ -175,7 +176,11 @@ cp claude_workspace/.claude/skills/implementation-plan/SKILL.md <project>/.claud
 cp claude_workspace/.claude/skills/walkthrough/SKILL.md <project>/.claude/skills/walkthrough/
 ```
 
-These hooks auto-generate:
+The hooks handle all automation:
+- **pre-tool-gate.py** — Session gate, budget enforcement, model selection, Gemini delegation
+- **post-tool-trace.py** — Langfuse tracing, throttle tracking, task/workflow artifacts, memory queue, doc staleness
+
+Auto-generated artifacts:
 - `tasks.md` — Live task list (on `Task*` tool calls)
 - `workflow_status.md` — Workflow progress (on `run_workflow`/`workflow_status` calls)
 
@@ -191,14 +196,16 @@ Create `<project>/.claude/settings.local.json`:
 ```json
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/pre-tool-gate.py", "timeout": 2000 }]
+      }
+    ],
     "PostToolUse": [
       {
-        "matcher": "Task.*",
-        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-task-artifact.py", "timeout": 3000 }]
-      },
-      {
-        "matcher": "mcp__orchestrator__(run_workflow|workflow_status)",
-        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/update-workflow-artifact.py", "timeout": 5000 }]
+        "matcher": ".*",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/post-tool-trace.py", "timeout": 5000 }]
       }
     ]
   },
@@ -206,6 +213,8 @@ Create `<project>/.claude/settings.local.json`:
     "allow": [
       "mcp__mem0__search_memories",
       "mcp__mem0__add_memory",
+      "mcp__mem0__list_memories",
+      "mcp__mem0__delete_memory",
       "mcp__mem0__search_graph",
       "mcp__mem0__get_entity",
       "mcp__gemini__analyze_files",
@@ -213,16 +222,19 @@ Create `<project>/.claude/settings.local.json`:
       "mcp__gemini__explain_architecture",
       "mcp__gemini__refresh_index",
       "mcp__gemini__ask_gemini",
+      "mcp__orchestrator__validate_system",
+      "mcp__orchestrator__init_session",
       "mcp__orchestrator__run_workflow",
       "mcp__orchestrator__workflow_status",
       "mcp__orchestrator__list_workflows",
       "mcp__orchestrator__cancel_workflow",
       "mcp__orchestrator__get_quota_state",
-      "mcp__orchestrator__get_cost_report",
-      "mcp__langfuse__log_event",
+      "mcp__orchestrator__get_quota_report",
+      "mcp__orchestrator__optimize_prompts",
       "mcp__langfuse__get_cost_report",
       "mcp__langfuse__get_agent_performance",
-      "mcp__langfuse__get_traces"
+      "mcp__langfuse__get_traces",
+      "mcp__langfuse__get_session_summary"
     ]
   },
   "enableAllProjectMcpServers": true,
@@ -284,5 +296,5 @@ When union_dev docs are finalized:
 ### Troubleshooting
 - **MCP server not connecting:** Check `uv run` path and env vars in .mcp.json
 - **mem0 search returns nothing:** Verify MEM0_APP_ID matches in .envrc and .mcp.json
-- **Gemini calls failing:** Check proxy status at localhost:1337/health
+- **Gemini calls failing:** Check proxy status at localhost:1338/health
 - **Langfuse empty:** Verify API keys, check hook is registered in settings

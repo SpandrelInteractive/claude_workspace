@@ -9,7 +9,7 @@ Rate limiting operates at 4 layers, from infrastructure to workflow level. The g
 ```mermaid
 graph TB
     subgraph "Layer 1: Proxy"
-        P[antigravity-claude-proxy<br/>localhost:1337]
+        P[antigravity-proxy v2<br/>localhost:1338]
         P --> MA[Multi-account failover]
         P --> PQ[Per-model quotas]
         P --> AB[Automatic backoff]
