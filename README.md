@@ -9,9 +9,9 @@ Claude Code is powerful on its own, but large projects quickly run into three pr
 It wraps Claude Code in an orchestration layer that:
 
 - **Routes work to the cheapest capable model.** A tiered system tries free Gemini models first (Flash Lite → Flash → Pro), then escalates to paid Claude models (Haiku → Sonnet → Opus) only when necessary. Most routine work — file analysis, code review, indexing — never touches Claude at all.
-- **Decomposes tasks into managed workflows.** Multi-step work (features, refactors, reviews) runs through a LangGraph state machine with checkpointing, budget enforcement, and human-in-the-loop approval at cost thresholds.
+- **Decomposes tasks into managed workflows.** Multi-step work runs through LangGraph state machines with checkpointing, budget enforcement, and human-in-the-loop approval. The SPDD workflow provides structured research → spec → implementation pipelines with verification gates between phases.
 - **Remembers context across sessions.** A dual-store memory system (Qdrant for vector similarity, Neo4j for relationship graphs) persists architectural decisions, domain knowledge, and patterns so you never re-explain your project.
-- **Provides full observability.** Every tool call, token usage, and dollar spent is traced through Langfuse, giving you a dashboard view of where your AI budget goes.
+- **Provides full observability.** Three trace sources (tool call hooks, proxy middleware, OTEL bridge) feed session-linked Langfuse dashboards showing exactly where your AI budget goes.
 
 ## How It Works
 
@@ -28,41 +28,45 @@ The system defines **eight specialized agent roles**, each mapped to specific mo
 | Indexer | Gemini Flash Lite | Codebase indexing via Repomix |
 | Evaluator | Gemini Flash | Workflow cost analysis and optimization |
 
-When you ask for something like "add an Order entity with line items," the Orchestrator decomposes it into a workflow: design → implement domain model → add persistence → create API → write tests → review. Each step routes to the appropriate role and model. A $2.00 budget cap on the workflow prevents runaway costs, and the system pauses for approval if it would exceed the limit.
+Two **consolidated hooks** enforce all policies automatically:
+
+| Hook | Trigger | Handles |
+|------|---------|---------|
+| `pre-tool-gate.py` | PreToolUse `.*` | Session gate, budget enforcement, model selection, Gemini delegation suggestions |
+| `post-tool-trace.py` | PostToolUse `.*` | Langfuse tracing, throttle tracking, task/workflow artifacts, memory queue, doc staleness |
+
+A shared library at `.claude/hooks/lib/` (state.py, langfuse.py, decisions.py) keeps the hooks maintainable.
 
 Five **MCP servers** handle the infrastructure:
 
 | Server | Purpose |
 |--------|---------|
-| **orchestrator-mcp** | LangGraph workflow engine with SQLite checkpointing |
+| **orchestrator-mcp** | LangGraph workflow engine with SQLite checkpointing, quota reporting |
 | **gemini-delegate** | Offloads bulk file reads, reviews, and analysis to free Gemini models |
 | **mem0-mcp** | Persistent vector + graph memory (Qdrant / Neo4j / Ollama embeddings) |
-| **langfuse-mcp** | Observability bridge for cost tracking and metrics |
+| **langfuse-mcp** | Read-only observability analytics (no ingestion — hooks and proxy handle that) |
 | **sequential-thinking** | Reflective reasoning for complex design problems |
-
-Rate limiting operates at four layers: per-model token caps, per-workflow budgets, session-level spend limits, and monthly quotas — all enforced automatically.
 
 ## What You Get
 
 After setup, your Claude Code sessions gain:
 
 - **Automatic cost optimization** — routine work offloaded to free models
-- **Structured workflows** — features, refactors, and reviews follow repeatable state machines
+- **Structured workflows** — features, refactors, reviews, and SPDD pipelines follow repeatable state machines
 - **Artifact-driven transparency** — plans, reviews, and status rendered as reviewable markdown files with inline feedback
-- **Persistent memory** — decisions and patterns survive across sessions
+- **Persistent memory** — decisions and patterns survive across sessions via mem0
 - **Specialized agent roles** — the right model for each type of work
-- **Full cost visibility** — Langfuse dashboard shows exactly where money goes
+- **Full cost visibility** — 3 trace sources feed session-linked Langfuse dashboards
+- **Velocity-based quota management** — call rate tracking with lockout risk assessment
 - **Project-specific skills** — teachable patterns and conventions for your domain
 - **Safe isolation** — implementation work runs in git worktrees to protect your main branch
 
 ## Prerequisites
 
-Part 1 infrastructure must be running:
-- Docker services: Qdrant, Neo4j, Ollama, Langfuse, Langfuse-DB
-- antigravity-claude-proxy on localhost:1337
+The [AI Infrastructure](https://github.com/SpandrelInteractive/ai-infra) repo must be running:
+- Docker services: Qdrant, Neo4j, Ollama, Langfuse, Langfuse-DB, OTEL Collector, OTEL Bridge
+- Antigravity proxy v2 on localhost:1338 (managed by PM2)
 - MCP servers installed: orchestrator-mcp, gemini-delegate, mem0-mcp, langfuse-mcp
-- Generic skills in `~/.claude/skills/`
-- Hooks in `~/.claude/hooks/`
 
 ## Quick Start
 
@@ -84,7 +88,7 @@ Part 1 infrastructure must be running:
 
    ```bash
    # Example: replace all at once
-   find . -type f -name '*.md' -o -name '*.json' -o -name '.envrc' | \
+   find . -type f \( -name '*.md' -o -name '*.json' -o -name '.envrc' \) | \
      xargs sed -i \
        -e 's|{{PROJECT_NAME}}|My App|g' \
        -e 's|{{PROJECT_ID}}|my_app|g' \
@@ -125,50 +129,56 @@ Part 1 infrastructure must be running:
 
 ```
 ├── CLAUDE.md                          # Main instructions (templatized)
-├── .mcp.json                          # MCP server configuration
+├── .mcp.json                          # MCP server configuration (port 1338)
 ├── .envrc                             # direnv environment
-├── .gitignore                         # Standard ignores + .gemini-index
+├── .gitignore
 ├── .claude/
-│   ├── settings.local.json            # MCP permissions + artifact hooks
+│   ├── settings.local.json            # 2 hook entries + MCP permissions
 │   ├── artifacts/                     # Generated deliverables (plans, reviews, status)
 │   ├── hooks/
-│   │   ├── update-task-artifact.py    # Task list artifact generator
-│   │   └── update-workflow-artifact.py # Workflow status artifact generator
+│   │   ├── pre-tool-gate.py           # Consolidated PreToolUse (session, budget, model, delegation)
+│   │   ├── post-tool-trace.py         # Consolidated PostToolUse (trace, throttle, artifacts, memory, docs)
+│   │   └── lib/                       # Shared library (state.py, langfuse.py, decisions.py)
 │   ├── docs/
-│   │   ├── usage-guide.md             # Generic framework guide
-│   │   ├── artifacts.md               # Artifact system documentation
-│   │   ├── project-guide.md.template  # Template for project-specific guide
-│   │   ├── project-setup-guide.md     # Full setup walkthrough
-│   │   ├── architecture-overview.md   # System diagrams
-│   │   ├── agent-roles.md             # Role definitions
-│   │   ├── mcp-servers.md             # Server reference
-│   │   ├── workflows.md               # Workflow state machines
-│   │   ├── observability.md           # Langfuse + hooks
+│   │   ├── INDEX.md                   # Documentation index + framework overview
+│   │   ├── usage-guide.md             # Practical framework reference
+│   │   ├── architecture-overview.md   # System diagrams and data flows
+│   │   ├── observability.md           # 3 trace sources, hooks, state files
+│   │   ├── mcp-servers.md             # Server reference with tool docs
+│   │   ├── workflows.md              # LangGraph state machines
+│   │   ├── agent-roles.md             # Role definitions and escalation
+│   │   ├── rate-limiting.md           # 4-layer quota strategy
 │   │   ├── skills-guide.md            # Skills ecosystem
-│   │   └── rate-limiting.md           # Budget strategy
+│   │   ├── artifacts.md               # Artifact lifecycle
+│   │   ├── project-setup-guide.md     # End-to-end setup walkthrough
+│   │   └── project-guide.md.template  # Template for project-specific guide
+│   ├── tools/
+│   │   ├── reset-mcps.sh             # MCP health check (--check) and reset
+│   │   └── sync-mao.sh               # Sync framework updates from source project
 │   └── skills/
-│       ├── implementation-plan/SKILL.md  # /implementation-plan command
-│       ├── walkthrough/SKILL.md          # /walkthrough command
-│       ├── README.md                  # Skills setup instructions
+│       ├── implementation-plan/SKILL.md
+│       ├── walkthrough/SKILL.md
+│       ├── README.md
 │       ├── project-patterns.SKILL.md.template
 │       └── project-workflows.SKILL.md.template
 ```
 
 ## Documentation
 
-Detailed guides live in `.claude/docs/`:
+Detailed guides live in `.claude/docs/`. Start with [`INDEX.md`](.claude/docs/INDEX.md) for the full table of contents and framework overview.
 
 | Guide | Contents |
 |-------|----------|
-| `usage-guide.md` | Full framework reference: MCP servers, agent roles, routing, cost optimization |
-| `artifacts.md` | Artifact system: types, lifecycle, hooks, renderers, feedback |
-| `architecture-overview.md` | System diagrams and component interactions |
-| `agent-roles.md` | Role definitions, model mappings, and escalation paths |
-| `mcp-servers.md` | MCP server internals and configuration |
-| `workflows.md` | LangGraph workflow state machines and budget enforcement |
-| `observability.md` | Langfuse tracing, hooks, and cost dashboards |
-| `skills-guide.md` | Skills ecosystem: discovery, creation, and composition |
-| `rate-limiting.md` | 4-layer budget caps and rate limit strategy |
+| `INDEX.md` | Framework overview, architecture summary, documentation index |
+| `usage-guide.md` | Routing cheat sheet, MCP tools, agent roles, common workflows, troubleshooting |
+| `architecture-overview.md` | System diagrams, data flows, model selection flowchart |
+| `observability.md` | 3 trace sources, 2 consolidated hooks, 3 state files, Langfuse setup |
+| `mcp-servers.md` | All 5 servers with tool reference and configuration |
+| `workflows.md` | LangGraph state machines and budget enforcement |
+| `agent-roles.md` | 6 roles with model mappings and escalation paths |
+| `rate-limiting.md` | 4-layer quota: proxy, orchestrator, cron, per-workflow |
+| `skills-guide.md` | Skills ecosystem: discovery, creation, composition |
+| `artifacts.md` | Artifact lifecycle: types, triggers, archival, feedback |
 | `project-setup-guide.md` | End-to-end setup walkthrough |
 
 ## Cleanup After Setup
@@ -178,3 +188,7 @@ Once you've replaced all placeholders and created your skills, you can delete:
 - `.claude/skills/README.md`
 - `.claude/skills/*.template`
 - `.claude/docs/project-guide.md.template`
+
+## Related
+
+- **[AI Infrastructure](https://github.com/SpandrelInteractive/ai-infra)** — MCP servers, proxy, and Docker services that power this template.
