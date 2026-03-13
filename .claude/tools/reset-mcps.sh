@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-MCP_CONFIG="/home/tohigu/projects/spandrel/RFPGatherer/.mcp.json"
+MCP_CONFIG="${CLAUDE_PROJECT_DIR:-.}/.mcp.json"
 
 # Map server names to process signatures for reliable matching
 declare -A SERVER_PATTERNS=(

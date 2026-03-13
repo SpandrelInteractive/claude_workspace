@@ -39,8 +39,14 @@ from lib.langfuse import send_trace, SKIP_TOOLS
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
-PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path(__file__).resolve().parents[2]))
+PROJECT_ROOT = Path(os.environ["CLAUDE_PROJECT_DIR"])
 ARTIFACTS_DIR = PROJECT_ROOT / ".claude" / "artifacts"
+
+# Locate framework docs relative to this hook file's directory.
+# Works whether hooks live at .claude/hooks/ or .claude/framework/hooks/
+_HOOKS_DIR = Path(__file__).resolve().parent
+_FRAMEWORK_ROOT = _HOOKS_DIR.parent  # .claude/ or .claude/framework/
+_DOCS_DIR = str(_FRAMEWORK_ROOT / "docs")
 
 # Source directories for doc staleness tracking
 _SOURCE_DIRS = {"backend/", "frontend/src/", "orchestrator-mcp/"}
@@ -48,9 +54,9 @@ _SOURCE_TO_DOCS = {
     "backend/src/scoring": ["docs/PSD.md", "docs/architecture_flow.md"],
     "backend/src/scraper": ["docs/architecture_flow.md"],
     "backend/src/match": ["docs/PSD.md"],
-    "orchestrator-mcp/": [".claude/docs/workflows.md", ".claude/docs/mcp-servers.md"],
-    "frontend/src/": [".claude/docs/architecture-overview.md"],
-    ".claude/hooks/": [".claude/docs/observability.md"],
+    "orchestrator-mcp/": [f"{_DOCS_DIR}/workflows.md", f"{_DOCS_DIR}/mcp-servers.md"],
+    "frontend/src/": [f"{_DOCS_DIR}/architecture-overview.md"],
+    str(_HOOKS_DIR) + "/": [f"{_DOCS_DIR}/observability.md"],
 }
 
 STATUS_ICONS_TASK = {
@@ -313,7 +319,7 @@ def handle_doc_tracker(tool_input: dict) -> None:
         return
 
     # Check if in tracked source directory
-    if not (any(d in file_path for d in _SOURCE_DIRS) or ".claude/hooks/" in file_path):
+    if not (any(d in file_path for d in _SOURCE_DIRS) or str(_HOOKS_DIR) in file_path):
         return
 
     # Find related docs
