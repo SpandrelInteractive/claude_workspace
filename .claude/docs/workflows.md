@@ -151,6 +151,41 @@ stateDiagram-v2
 
 **Budget profile:** Low (all Gemini)
 
+### SPDD Feature Workflow
+
+Structured research → spec → implementation pipeline with verification gates. Uses SPDD (Spec-Plan-Do-Deliver) methodology with domain skill loading and context acquisition.
+
+```mermaid
+stateDiagram-v2
+    [*] --> context_acquire
+    context_acquire --> research
+    research --> spec: success
+    research --> [*]: failure
+    spec --> synthesize: success
+    spec --> [*]: failure
+    synthesize --> [*]
+```
+
+**Nodes:**
+| Node | Model | Action | Artifact |
+|------|-------|--------|----------|
+| `context_acquire` | N/A (I/O only) | Load SPDD skills, project docs, domain skills, file contents | — |
+| `research` | Gemini 3 Flash | Analyze codebase and task context, produce research report | — |
+| `spec` | Gemini 3 Flash | Create phased implementation spec with file changes and verification criteria | `implementation_plan.md` |
+| `synthesize` | Gemini 3 Flash | Convert spec into structured execution instructions for Claude Code agents | `task_plan.md`, `workflow_status.md` |
+
+**Verification gates:** Conditional edges after `research` and `spec` — if a node sets `status: "failed"`, the workflow routes to END instead of continuing.
+
+**Context acquisition loads:**
+- SPDD skill files (`1-research.md`, `2-spec.md`, `3-implementation.md`)
+- Project docs (CLAUDE.md, PSD.md, architecture_flow.md)
+- Domain skills from options (e.g., `rfp_gatherer-patterns`)
+- Specified file contents (up to 10 files, <20KB each)
+
+**Budget profile:** Medium
+
+---
+
 ## Checkpoint and Resume
 
 - **Storage:** SQLite at `orchestrator-mcp/checkpoints.db`

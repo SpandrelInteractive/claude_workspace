@@ -156,15 +156,22 @@ Get all relationships for a named entity from the knowledge graph.
 
 ### Tools
 
+#### `init_session() -> dict`
+Initialize a new work session — **must be called before any other action**. Validates system health (proxy, Qdrant, Ollama, Langfuse), consumes pending memory queue, writes session breadcrumb, and returns quota recommendations.
+- **Returns:** `{ status, health, quota, memory_queue, breadcrumb, context_loaded, instructions }`
+
+#### `validate_system() -> dict`
+Check that all required infrastructure services are healthy. Returns readiness status with fix commands for any failed services.
+
 #### `run_workflow(type: str, description: str, files: list[str] = [], options: dict = {}) -> dict`
 Launch a stateful multi-step workflow. Generates artifacts at phase transitions (task plans, implementation plans, review results) to `.claude/artifacts/`.
-- **type:** "feature", "review", "refactor", "sprint"
+- **type:** "feature", "review", "refactor", "sprint", "spdd_feature"
 - **Returns:** `{ workflow_id, status, current_step, next_action }`
-- **Artifacts:** Triggers `update-workflow-artifact.py` PostToolUse hook → `workflow_status.md`
-- **Example:** `run_workflow("feature", "Add user authentication", files=["src/auth/"])`
+- **Artifacts:** `post-tool-trace.py` hook renders `workflow_status.md` on each call
+- **Example:** `run_workflow("spdd_feature", "Add user authentication", files=["src/auth/"])`
 
 #### `workflow_status(workflow_id: str) -> dict`
-Get progress of a running workflow. Updates `workflow_status.md` artifact via PostToolUse hook.
+Get progress of a running workflow. Triggers artifact update via PostToolUse hook.
 - **Returns:** `{ workflow_id, status, completed_steps, current_step, next_action, cost_so_far }`
 
 #### `list_workflows(status_filter: str = "all") -> list[dict]`

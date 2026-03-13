@@ -116,6 +116,7 @@ Manages multi-step stateful workflows via LangGraph with SQLite checkpointing.
 | `refactor` | $2.00 | analyze_scope → plan → execute_change → verify |
 | `review` | $0.50 | analyze → report |
 | `sprint` | $0.50 | decompose → prioritize → execute |
+| `spdd_feature` | $2.00 | context acquire → research → spec → synthesize (structured pipeline with verification gates) |
 
 Projects can define additional workflow types in their `<project>-workflows` skill.
 
